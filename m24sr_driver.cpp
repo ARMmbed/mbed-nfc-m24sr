@@ -78,14 +78,15 @@ namespace ST {
 #define C_APDU_INTERRUPT           0xD6
 
 /* length */
-#define STATUS_NBBYTE                 2
-#define CRC_NBBYTE                    2
-#define STATUSRESPONSE_NBBYTE         5
-#define DESELECTREQUEST_COMMAND      {0xC2,0xE0,0xB4}
-#define DESELECTRESPONSE_NBBYTE       3
-#define WATINGTIMEEXTRESPONSE_NBBYTE  4
-#define PASSWORD_NBBYTE               0x10
-#define SELECTAPPLICATION_COMMAND    {0xD2,0x76,0x00,0x00,0x85,0x01,0x01}
+#define STATUS_LENGTH                    2
+#define CRC_LENGTH                       2
+#define STATUSRESPONSE_LENGTH            5
+#define DESELECT_RESPONSE_LENGTH         3
+#define WATING_TIME_EXT_RESPONSE_LENGTH  4
+#define PASSWORD_LENGTH                  16
+
+#define DESELECT_REQUEST_COMMAND     {0xC2,0xE0,0xB4}
+#define SELECT_APPLICATION_COMMAND   {0xD2,0x76,0x00,0x00,0x85,0x01,0x01}
 
 /* command structure mask */
 #define CMD_MASK_SELECTAPPLICATION    0x01FF
@@ -296,7 +297,7 @@ static M24srError_t is_S_block(uint8_t *buffer) {
  * @return M24SR_SUCCESS if no errors
  */
 M24srError_t M24srDriver::send_fwt_extension(uint8_t fwt_byte) {
-    uint8_t buffer[STATUSRESPONSE_NBBYTE];
+    uint8_t buffer[STATUSRESPONSE_LENGTH];
     M24srError_t status;
     uint8_t length = 0;
     uint16_t crc16;
@@ -402,7 +403,7 @@ M24srError_t M24srDriver::init() {
  * @return M24SR_SUCCESS if no errors
  */
 M24srError_t M24srDriver::deselect() {
-    uint8_t buffer[] = DESELECTREQUEST_COMMAND;
+    uint8_t buffer[] = DESELECT_REQUEST_COMMAND;
     M24srError_t status;
 
     /* send the request */
@@ -477,7 +478,7 @@ M24srError_t M24srDriver::get_session(bool force) {
 M24srError_t M24srDriver::select_application() {
     C_APDU command;
     M24srError_t status;
-    uint8_t data_out[] = SELECTAPPLICATION_COMMAND;
+    uint8_t data_out[] = SELECT_APPLICATION_COMMAND;
     uint16_t P1_P2 =0x0400;
     uint16_t length;
 
@@ -520,7 +521,7 @@ M24srError_t M24srDriver::select_application() {
 }
 
 M24srError_t M24srDriver::receive_select_application() {
-    uint8_t data_in[STATUSRESPONSE_NBBYTE];
+    uint8_t data_in[STATUSRESPONSE_LENGTH];
     M24srError_t status;
 
     _last_command = NONE;
@@ -598,7 +599,7 @@ M24srError_t M24srDriver::select_cc_file() {
 }
 
 M24srError_t M24srDriver::receive_select_cc_file() {
-    uint8_t data_in[STATUSRESPONSE_NBBYTE];
+    uint8_t data_in[STATUSRESPONSE_LENGTH];
     M24srError_t status;
 
     _last_command = NONE;
@@ -664,7 +665,7 @@ M24srError_t M24srDriver::select_system_file() {
 }
 
 M24srError_t M24srDriver::receive_select_system_file() {
-    uint8_t data_in[STATUSRESPONSE_NBBYTE];
+    uint8_t data_in[STATUSRESPONSE_LENGTH];
     M24srError_t status;
 
     _last_command = NONE;
@@ -729,7 +730,7 @@ M24srError_t M24srDriver::select_ndef_file(uint16_t ndef_file_id) {
 }
 
 M24srError_t M24srDriver::receive_select_ndef_file() {
-    uint8_t data_in[STATUSRESPONSE_NBBYTE];
+    uint8_t data_in[STATUSRESPONSE_LENGTH];
     M24srError_t status;
 
     _last_command = NONE;
@@ -809,12 +810,12 @@ M24srError_t M24srDriver::receive_read_binary() {
 
     _last_command = NONE;
 
-    status = io_receive_i2c_response(length + STATUSRESPONSE_NBBYTE, _buffer);
+    status = io_receive_i2c_response(length + STATUSRESPONSE_LENGTH, _buffer);
     if (status != M24SR_SUCCESS) {
         get_callback()->on_read_byte(this, status, offset, data, length);
         return status;
     }
-    status = is_correct_crc_residue(_buffer, length + STATUSRESPONSE_NBBYTE);
+    status = is_correct_crc_residue(_buffer, length + STATUSRESPONSE_LENGTH);
     if (status != M24SR_SUCCESS) {
         get_callback()->on_read_byte(this, status, offset, data, length);
     } else {
@@ -936,7 +937,7 @@ M24srError_t M24srDriver::update_binary(uint16_t offset, uint8_t length, const u
 }
 
 M24srError_t M24srDriver::receive_update_binary() {
-    uint8_t response[STATUSRESPONSE_NBBYTE];
+    uint8_t response[STATUSRESPONSE_LENGTH];
     M24srError_t status;
     const uint16_t length = _last_command_data.length;
     uint8_t *data = _last_command_data.data;
@@ -952,7 +953,7 @@ M24srError_t M24srDriver::receive_update_binary() {
 
     if (is_S_block(response) == M24SR_SUCCESS) {
         /* check the CRC */
-        status = is_correct_crc_residue(response, WATINGTIMEEXTRESPONSE_NBBYTE);
+        status = is_correct_crc_residue(response, WATING_TIME_EXT_RESPONSE_LENGTH);
         // TODO: why if we check ==NFC_Commandsuccess it fail?
         if (status != M24SR_IO_ERROR_CRC) {
             /* send the FrameExension response*/
@@ -962,7 +963,7 @@ M24srError_t M24srDriver::receive_update_binary() {
             }
         }
     } else {
-        status = is_correct_crc_residue(response, STATUSRESPONSE_NBBYTE);
+        status = is_correct_crc_residue(response, STATUSRESPONSE_LENGTH);
         get_callback()->on_updated_binary(this, status, offset, data, length);
     }
 
@@ -994,7 +995,7 @@ M24srError_t M24srDriver::verify(PasswordType_t password_type, const uint8_t *pa
     command.header.P1 = GETMSB(password_type);
     command.header.P2 = GETLSB(password_type);
     /* copy the number of bytes of the data field */
-    command.body.LC = password ? 0x10 : 0x00;
+    command.body.LC = password ? PASSWORD_LENGTH : 0;
 
     if (password) {
         /* copy the password */
@@ -1033,7 +1034,7 @@ M24srError_t M24srDriver::verify(PasswordType_t password_type, const uint8_t *pa
 
 M24srError_t M24srDriver::receive_verify() {
     M24srError_t status;
-    uint8_t respBuffer[STATUSRESPONSE_NBBYTE];
+    uint8_t respBuffer[STATUSRESPONSE_LENGTH];
     _last_command = NONE;
 
     const uint8_t *data = _last_command_data.data;
@@ -1046,7 +1047,7 @@ M24srError_t M24srDriver::receive_verify() {
         return status;
     }
 
-    status = is_correct_crc_residue(respBuffer, STATUSRESPONSE_NBBYTE);
+    status = is_correct_crc_residue(respBuffer, STATUSRESPONSE_LENGTH);
     get_callback()->on_verified(this, status, type, data);
     return status;
 }
@@ -1076,7 +1077,7 @@ M24srError_t M24srDriver::change_reference_data(PasswordType_t password_type, co
     command.header.P1 = GETMSB(password_type);
     command.header.P2 = GETLSB(password_type);
     /* copy the number of byte of the data field */
-    command.body.LC = PASSWORD_NBBYTE;
+    command.body.LC = PASSWORD_LENGTH;
     /* copy the password */
     command.body.data = password;
     /* build the command */
@@ -1110,18 +1111,18 @@ M24srError_t M24srDriver::change_reference_data(PasswordType_t password_type, co
 
 M24srError_t M24srDriver::receive_change_reference_data() {
     M24srError_t status;
-    uint8_t rensponse[STATUSRESPONSE_NBBYTE];
+    uint8_t rensponse[STATUSRESPONSE_LENGTH];
 
     PasswordType_t type = PasswordType_t(_last_command_data.offset);
     uint8_t *data = _last_command_data.data;
 
-    status = io_receive_i2c_response(STATUSRESPONSE_NBBYTE, rensponse);
+    status = io_receive_i2c_response(STATUSRESPONSE_LENGTH, rensponse);
     if (status != M24SR_SUCCESS) {
         get_callback()->on_change_reference_data(this, status, type, data);
         return status;
     }
 
-    status = is_correct_crc_residue(rensponse, STATUSRESPONSE_NBBYTE);
+    status = is_correct_crc_residue(rensponse, STATUSRESPONSE_LENGTH);
     get_callback()->on_change_reference_data(this, status, type, data);
     return status;
 }
@@ -1180,17 +1181,17 @@ M24srError_t M24srDriver::enable_verification_requirement(PasswordType_t passwor
 
 M24srError_t M24srDriver::receive_enable_verification_requirement() {
     M24srError_t status;
-    uint8_t rensponse[STATUSRESPONSE_NBBYTE];
+    uint8_t rensponse[STATUSRESPONSE_LENGTH];
 
     PasswordType_t type = PasswordType_t(_last_command_data.offset);
 
-    status = io_receive_i2c_response(STATUSRESPONSE_NBBYTE, rensponse);
+    status = io_receive_i2c_response(STATUSRESPONSE_LENGTH, rensponse);
     if (status != M24SR_SUCCESS) {
         get_callback()->on_enable_verification_requirement(this, status, type);
         return status;
     }
 
-    status = is_correct_crc_residue(rensponse, STATUSRESPONSE_NBBYTE);
+    status = is_correct_crc_residue(rensponse, STATUSRESPONSE_LENGTH);
     get_callback()->on_enable_verification_requirement(this, status, type);
     return status;
 }
@@ -1248,17 +1249,17 @@ M24srError_t M24srDriver::disable_verification_requirement(PasswordType_t passwo
 
 M24srError_t M24srDriver::receive_disable_verification_requirement() {
     M24srError_t status;
-    uint8_t rensponse[STATUSRESPONSE_NBBYTE];
+    uint8_t rensponse[STATUSRESPONSE_LENGTH];
 
     PasswordType_t type = PasswordType_t(_last_command_data.offset);
 
-    status = io_receive_i2c_response(STATUSRESPONSE_NBBYTE, rensponse);
+    status = io_receive_i2c_response(STATUSRESPONSE_LENGTH, rensponse);
     if (status != M24SR_SUCCESS) {
         get_callback()->on_disable_verification_requirement(this, status, type);
         return status;
     }
 
-    status = is_correct_crc_residue(rensponse, STATUSRESPONSE_NBBYTE);
+    status = is_correct_crc_residue(rensponse, STATUSRESPONSE_LENGTH);
     get_callback()->on_disable_verification_requirement(this, status, type);
     return status;
 }
@@ -1316,17 +1317,17 @@ M24srError_t M24srDriver::enable_permanent_state(PasswordType_t password_type) {
 
 M24srError_t M24srDriver::receive_enable_permanent_state() {
     M24srError_t status;
-    uint8_t rensponse[STATUSRESPONSE_NBBYTE];
+    uint8_t rensponse[STATUSRESPONSE_LENGTH];
 
     PasswordType_t type = PasswordType_t(_last_command_data.offset);
 
-    status = io_receive_i2c_response(STATUSRESPONSE_NBBYTE, rensponse);
+    status = io_receive_i2c_response(STATUSRESPONSE_LENGTH, rensponse);
     if (status != M24SR_SUCCESS) {
         get_callback()->on_enable_permanent_state(this, status, type);
         return status;
     }
 
-    status = is_correct_crc_residue(rensponse, STATUSRESPONSE_NBBYTE);
+    status = is_correct_crc_residue(rensponse, STATUSRESPONSE_LENGTH);
     get_callback()->on_enable_permanent_state(this, status, type);
     return status;
 }
@@ -1384,17 +1385,17 @@ M24srError_t M24srDriver::disable_permanent_state(PasswordType_t password_type) 
 
 M24srError_t M24srDriver::receive_disable_permanent_state() {
     M24srError_t status;
-    uint8_t rensponse[STATUSRESPONSE_NBBYTE];
+    uint8_t rensponse[STATUSRESPONSE_LENGTH];
 
     PasswordType_t type = PasswordType_t(_last_command_data.offset);
 
-    status = io_receive_i2c_response(STATUSRESPONSE_NBBYTE, rensponse);
+    status = io_receive_i2c_response(STATUSRESPONSE_LENGTH, rensponse);
     if (status != M24SR_SUCCESS) {
         get_callback()->on_disable_permanent_state(this, status, type);
         return status;
     }
 
-    status = is_correct_crc_residue(rensponse, STATUSRESPONSE_NBBYTE);
+    status = is_correct_crc_residue(rensponse, STATUSRESPONSE_LENGTH);
     get_callback()->on_disable_permanent_state(this, status, type);
     return status;
 }
@@ -1439,11 +1440,11 @@ M24srError_t M24srDriver::send_receive_i2c(uint16_t length, uint8_t *buffer) {
         return status;
 
     /* read the response */
-    status = io_receive_i2c_response(STATUSRESPONSE_NBBYTE, buffer);
+    status = io_receive_i2c_response(STATUSRESPONSE_LENGTH, buffer);
     if (status != M24SR_SUCCESS)
         return status;
 
-    return is_correct_crc_residue(buffer, STATUSRESPONSE_NBBYTE);
+    return is_correct_crc_residue(buffer, STATUSRESPONSE_LENGTH);
 }
 
 /**
