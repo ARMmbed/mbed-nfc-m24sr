@@ -152,12 +152,12 @@ static uint16_t update_crc(uint8_t ch, uint16_t *lpw_crc) {
  * @retval CRC16 
  */
 static uint16_t compute_crc(uint8_t *data, uint8_t length) {
-    uint8_t chBlock;
+    uint8_t block;
     uint16_t crc16 = 0x6363; // ITU-V.41
 
     do {
-        chBlock = *data++;
-        update_crc(chBlock, &crc16);
+        block = *data++;
+        update_crc(block, &crc16);
     } while (--length);
 
     return crc16;
@@ -291,49 +291,6 @@ static M24srError_t is_S_block(uint8_t *buffer) {
     }
 }
 
-/**
- * @brief This function sends the FWT extension command (S-Block format)
- * @param fwt_byte  FWT value
- * @return M24SR_SUCCESS if no errors
- */
-M24srError_t M24srDriver::send_fwt_extension(uint8_t fwt_byte) {
-    uint8_t buffer[STATUSRESPONSE_LENGTH];
-    M24srError_t status;
-    uint8_t length = 0;
-    uint16_t crc16;
-
-    /* create the response */
-    buffer[length++] = 0xF2;
-    buffer[length++] = fwt_byte;
-    /* compute the CRC */
-    crc16 = compute_crc(buffer, 0x02);
-    /* append the CRC16 */
-    buffer[length++] = GETLSB(crc16);
-    buffer[length++] = GETMSB(crc16);
-
-    /* send the request */
-    status = io_send_i2c_command(length, buffer);
-    if (status != M24SR_SUCCESS) {
-        return status;
-    }
-
-    _last_command = UPDATE;
-
-    if (_communication_type == SYNC) {
-        status = io_poll_i2c();
-        if (status == M24SR_SUCCESS) {
-            return receive_update_binary();
-        } else {
-            _last_command = NONE;
-            get_callback()->on_updated_binary(this, status, _last_command_data.offset, _last_command_data.data,
-                                              _last_command_data.length);
-            return status;
-        }
-    }
-
-    return M24SR_SUCCESS;
-}
-
 M24srDriver::M24srDriver()
     : _i2c_channel(NFC_I2C_SDA_PIN, NFC_I2C_SCL_PIN),
       _gpo_event_interrupt(NFC_GPO_PIN),
@@ -399,6 +356,60 @@ M24srError_t M24srDriver::init() {
 }
 
 /**
+ * Handle communication if SYNC mode is selected
+ * @param status the return error
+ * @return true if communication has been handled successfully (or was not needed)
+ */
+bool M24srDriver::manage_sync_communication(M24srError_t *status) {
+    if (_communication_type == SYNC) {
+        *status = io_poll_i2c();
+        if (*status == M24SR_SUCCESS) {
+            *status = manage_event();
+        } else {
+            _last_command = NONE;
+            return false;
+        }
+    }
+    return true;
+}
+
+/**
+ * @brief This function sends the FWT extension command (S-Block format)
+ * @param fwt_byte  FWT value
+ * @return M24SR_SUCCESS if no errors
+ */
+M24srError_t M24srDriver::send_fwt_extension(uint8_t fwt_byte) {
+    uint8_t buffer[STATUSRESPONSE_LENGTH];
+    M24srError_t status;
+    uint8_t length = 0;
+    uint16_t crc16;
+
+    /* create the response */
+    buffer[length++] = 0xF2;
+    buffer[length++] = fwt_byte;
+    /* compute the CRC */
+    crc16 = compute_crc(buffer, 0x02);
+    /* append the CRC16 */
+    buffer[length++] = GETLSB(crc16);
+    buffer[length++] = GETMSB(crc16);
+
+    /* send the request */
+    status = io_send_i2c_command(length, buffer);
+    if (status != M24SR_SUCCESS) {
+        return status;
+    }
+
+    _last_command = UPDATE;
+
+    if (!manage_sync_communication(&status)) {
+        get_callback()->on_updated_binary(this, status, _last_command_data.offset, _last_command_data.data,
+                                          _last_command_data.length);
+    }
+
+    return status;
+}
+
+/**
  * @brief This function sends the Deselect command (S-Block format)
  * @return M24SR_SUCCESS if no errors
  */
@@ -415,18 +426,11 @@ M24srError_t M24srDriver::deselect() {
 
     _last_command = DESELECT;
 
-    if (_communication_type == SYNC) {
-        status = io_poll_i2c();
-        if (status == M24SR_SUCCESS) {
-            return receive_deselect();
-        } else {
-            _last_command = NONE;
-            get_callback()->on_selected_application(this, status);
-            return status;
-        }
+    if (!manage_sync_communication(&status)) {
+        get_callback()->on_selected_application(this, status);
     }
 
-    return M24SR_SUCCESS;
+    return status;
 }
 
 M24srError_t M24srDriver::receive_deselect() {
@@ -476,24 +480,13 @@ M24srError_t M24srDriver::get_session(bool force) {
  * @return M24SR_SUCCESS if no errors
  */
 M24srError_t M24srDriver::select_application() {
-    C_APDU command;
     M24srError_t status;
     uint8_t data_out[] = SELECT_APPLICATION_COMMAND;
-    uint16_t P1_P2 =0x0400;
+    uint16_t P1_P2 = 0x0400;
     uint16_t length;
 
-    /* build the command */
-    command.header.CLA = C_APDU_CLA_DEFAULT;
-    command.header.INS = C_APDU_SELECT_FILE;
-    /* copy the offset */
-    command.header.P1 = GETMSB(P1_P2);
-    command.header.P2 = GETLSB(P1_P2);
-    /* copy the number of byte of the data field */
-    command.body.LC = sizeof(data_out);
-    /* copy the data */
-    command.body.data = data_out;
-    /* copy the number of byte to read */
-    command.body.LE = 0;
+    C_APDU command(C_APDU_CLA_DEFAULT, C_APDU_SELECT_FILE, P1_P2, sizeof(data_out), data_out, 0);
+
     /* build the I2C command */
     build_I_block_command(CMD_MASK_SELECTAPPLICATION, &command, _did_byte, &length, _buffer);
 
@@ -506,18 +499,11 @@ M24srError_t M24srDriver::select_application() {
 
     _last_command = SELECT_APPLICATION;
 
-    if (_communication_type == SYNC) {
-        status = io_poll_i2c();
-        if (status == M24SR_SUCCESS) {
-            return receive_select_application();
-        } else {
-            _last_command = NONE;
-            get_callback()->on_selected_application(this, status);
-            return status;
-        }
+    if (!manage_sync_communication(&status)) {
+        get_callback()->on_selected_application(this, status);
     }
 
-    return M24SR_SUCCESS;
+    return status;
 }
 
 M24srError_t M24srDriver::receive_select_application() {
@@ -557,21 +543,13 @@ M24srError_t M24srDriver::read_id(uint8_t *nfc_id) {
  * @retval Status (SW1&SW2)   if operation does not complete for another reason.
  */
 M24srError_t M24srDriver::select_cc_file() {
-    C_APDU command;
     M24srError_t status;
     uint8_t data_out[] = CC_FILE_ID_BYTES;
     uint16_t P1_P2 =0x000C;
     uint16_t length;
 
-    /* build the command */
-    command.header.CLA = C_APDU_CLA_DEFAULT;
-    command.header.INS = C_APDU_SELECT_FILE;
-    /* copy the offset */
-    command.header.P1 = GETMSB(P1_P2);
-    command.header.P2 = GETLSB(P1_P2);
-    /* copy the number of byte of the data field */
-    command.body.LC = sizeof(data_out);
-    command.body.data = data_out;
+    C_APDU command(C_APDU_CLA_DEFAULT, C_APDU_SELECT_FILE, P1_P2, sizeof(data_out), data_out, 0);
+
     /* build the I2C command */
     build_I_block_command(CMD_MASK_SELECTCCFILE, &command, _did_byte, &length, _buffer);
 
@@ -584,18 +562,11 @@ M24srError_t M24srDriver::select_cc_file() {
 
     _last_command = SELECT_CC_FILE;
 
-    if (_communication_type == SYNC) {
-        status = io_poll_i2c();
-        if (status == M24SR_SUCCESS) {
-            return receive_select_cc_file();
-        } else {
-            _last_command = NONE;
-            get_callback()->on_selected_cc_file(this, status);
-            return status;
-        }
+    if (!manage_sync_communication(&status)) {
+        get_callback()->on_selected_cc_file(this, status);
     }
 
-    return M24SR_SUCCESS;
+    return status;
 }
 
 M24srError_t M24srDriver::receive_select_cc_file() {
@@ -623,21 +594,13 @@ M24srError_t M24srDriver::receive_select_cc_file() {
  * @retval M24SR_ERROR_I2CTIMEOUT I2C timeout occurred.
  */
 M24srError_t M24srDriver::select_system_file() {
-    C_APDU command;
     uint8_t data_out[] = SYSTEM_FILE_ID_BYTES;
     M24srError_t status;
     uint16_t P1_P2 = 0x000C;
     uint16_t length;
 
-    /* build the command */
-    command.header.CLA = C_APDU_CLA_DEFAULT;
-    command.header.INS = C_APDU_SELECT_FILE;
-    /* copy the offset */
-    command.header.P1 = GETMSB(P1_P2);
-    command.header.P2 = GETLSB(P1_P2);
-    /* copy the number of byte of the data field */
-    command.body.LC = sizeof(data_out);
-    command.body.data = data_out;
+    C_APDU command(C_APDU_CLA_DEFAULT, C_APDU_SELECT_FILE, P1_P2, sizeof(data_out), data_out, 0);
+
     /* build the command */
     build_I_block_command(CMD_MASK_SELECTCCFILE, &command, _did_byte, &length, _buffer);
 
@@ -650,18 +613,11 @@ M24srError_t M24srDriver::select_system_file() {
 
     _last_command = SELECT_SYSTEM_FILE;
 
-    if (_communication_type == SYNC) {
-        status = io_poll_i2c();
-        if (status == M24SR_SUCCESS) {
-            return receive_select_system_file();
-        } else {
-            _last_command = NONE;
-            get_callback()->on_selected_system_file(this, status);
-            return status;
-        }
+    if (!manage_sync_communication(&status)) {
+        get_callback()->on_selected_system_file(this, status);
     }
 
-    return M24SR_SUCCESS;
+    return status;
 }
 
 M24srError_t M24srDriver::receive_select_system_file() {
@@ -689,22 +645,13 @@ M24srError_t M24srDriver::receive_select_system_file() {
  * @retval M24SR_ERROR_I2CTIMEOUT I2C timeout occurred.
  */
 M24srError_t M24srDriver::select_ndef_file(uint16_t ndef_file_id) {
-    C_APDU command;
     M24srError_t status;
     uint8_t data_out[] = { GETMSB(ndef_file_id), GETLSB(ndef_file_id) };
     uint16_t P1_P2 = 0x000C;
     uint16_t length;
 
-    /* build the command */
-    command.header.CLA = C_APDU_CLA_DEFAULT;
-    command.header.INS = C_APDU_SELECT_FILE;
-    /* copy the offset */
-    command.header.P1 = GETMSB(P1_P2);
-    command.header.P2 = GETLSB(P1_P2);
-    /* copy the number of byte of the data field */
-    command.body.LC = sizeof(data_out);
-    command.body.data = data_out;
-    /* copy the offset */
+    C_APDU command(C_APDU_CLA_DEFAULT, C_APDU_SELECT_FILE, P1_P2, sizeof(data_out), data_out, 0);
+
     /* build the I2C command */
     build_I_block_command(CMD_MASK_SELECTNDEFFILE, &command, _did_byte, &length, _buffer);
 
@@ -715,18 +662,11 @@ M24srError_t M24srDriver::select_ndef_file(uint16_t ndef_file_id) {
     }
     _last_command = SELECT_NDEF_FILE;
 
-    if (_communication_type == SYNC) {
-        status = io_poll_i2c();
-        if (status == M24SR_SUCCESS) {
-            return receive_select_ndef_file();
-        } else {
-            _last_command = NONE;
-            get_callback()->on_selected_ndef_file(this, status);
-            return status;
-        }
+    if (!manage_sync_communication(&status)) {
+        get_callback()->on_selected_ndef_file(this, status);
     }
 
-    return M24SR_SUCCESS;
+    return status;
 }
 
 M24srError_t M24srDriver::receive_select_ndef_file() {
@@ -757,7 +697,6 @@ M24srError_t M24srDriver::receive_select_ndef_file() {
  * @retval M24SR_ERROR_I2CTIMEOUT I2C timeout occurred.
  */
 M24srError_t M24srDriver::read_binary(uint16_t offset, uint8_t length, uint8_t *buffer) {
-    C_APDU command;
     uint16_t command_length;
     M24srError_t status;
 
@@ -766,14 +705,7 @@ M24srError_t M24srDriver::read_binary(uint16_t offset, uint8_t length, uint8_t *
         length = MAX_OPERATION_SIZE;
     }
 
-    /* build the command */
-    command.header.CLA = C_APDU_CLA_DEFAULT;
-    command.header.INS = C_APDU_READ_BINARY;
-    /* copy the offset */
-    command.header.P1 = GETMSB(offset);
-    command.header.P2 = GETLSB(offset);
-    /* copy the number of byte to read */
-    command.body.LE = length;
+    C_APDU command(C_APDU_CLA_DEFAULT, C_APDU_READ_BINARY, offset, 0, NULL, length);
 
     build_I_block_command(CMD_MASK_READBINARY, &command, _did_byte, &command_length, _buffer);
 
@@ -788,18 +720,11 @@ M24srError_t M24srDriver::read_binary(uint16_t offset, uint8_t length, uint8_t *
     _last_command_data.length = length;
     _last_command_data.offset = offset;
 
-    if (_communication_type == SYNC) {
-        status = io_poll_i2c();
-        if (status == M24SR_SUCCESS) {
-            return receive_read_binary();
-        } else {
-            _last_command = NONE;
-            get_callback()->on_read_byte(this, status, offset, buffer, length);
-            return status;
-        }
+    if (!manage_sync_communication(&status)) {
+        get_callback()->on_read_byte(this, status, offset, buffer, length);
     }
 
-    return M24SR_SUCCESS;
+    return status;
 }
 
 M24srError_t M24srDriver::receive_read_binary() {
@@ -836,7 +761,6 @@ M24srError_t M24srDriver::receive_read_binary() {
  * @retval M24SR_ERROR_I2CTIMEOUT I2C timeout occurred.
  */
 M24srError_t M24srDriver::st_read_binary(uint16_t offset, uint8_t length, uint8_t *buffer) {
-    C_APDU command;
     uint16_t command_length;
     M24srError_t status;
 
@@ -845,14 +769,7 @@ M24srError_t M24srDriver::st_read_binary(uint16_t offset, uint8_t length, uint8_
         length = MAX_OPERATION_SIZE;
     }
 
-    /* build the command */
-    command.header.CLA = C_APDU_CLA_ST;
-    command.header.INS = C_APDU_READ_BINARY;
-    /* copy the offset */
-    command.header.P1 = GETMSB(offset);
-    command.header.P2 = GETLSB(offset);
-    /* copy the number of byte to read */
-    command.body.LE = length;
+    C_APDU command(C_APDU_CLA_ST, C_APDU_READ_BINARY, offset, 0, NULL, length);
 
     build_I_block_command(CMD_MASK_READBINARY, &command, _did_byte, &command_length, _buffer);
 
@@ -866,18 +783,11 @@ M24srError_t M24srDriver::st_read_binary(uint16_t offset, uint8_t length, uint8_
     _last_command_data.data = buffer;
     _last_command_data.length = length;
 
-    if (_communication_type == SYNC) {
-        status = io_poll_i2c();
-        if (status == M24SR_SUCCESS) {
-            return receive_read_binary();
-        } else {
-            _last_command = NONE;
-            get_callback()->on_read_byte(this, status, offset, buffer, length);
-            return status;
-        }
+    if (!manage_sync_communication(&status)) {
+        get_callback()->on_read_byte(this, status, offset, buffer, length);
     }
 
-    return M24SR_SUCCESS;
+    return status;
 }
 
 /**
@@ -889,7 +799,6 @@ M24srError_t M24srDriver::st_read_binary(uint16_t offset, uint8_t length, uint8_
  * @retval M24SR_ERROR_I2CTIMEOUT I2C timeout occurred.
  */
 M24srError_t M24srDriver::update_binary(uint16_t offset, uint8_t length, const uint8_t *data) {
-    C_APDU command;
     M24srError_t status;
     uint16_t command_length;
 
@@ -898,17 +807,8 @@ M24srError_t M24srDriver::update_binary(uint16_t offset, uint8_t length, const u
         length = MAX_OPERATION_SIZE;
     }
 
-    /* build the command */
-    command.header.CLA = C_APDU_CLA_DEFAULT;
-    command.header.INS = C_APDU_UPDATE_BINARY;
-    /* copy the offset */
-    command.header.P1 = GETMSB(offset);
-    command.header.P2 = GETLSB(offset);
-    /* copy the number of byte of the data field */
-    command.body.LC = length;
-    command.body.data = data;
-    /* copy the File Id */
-    //memcpy(command.Body.pData ,data, length );
+    C_APDU command(C_APDU_CLA_DEFAULT, C_APDU_UPDATE_BINARY, offset, length, data, 0);
+
     build_I_block_command(CMD_MASK_UPDATEBINARY, &command, _did_byte, &command_length, _buffer);
 
     status = io_send_i2c_command(command_length, _buffer);
@@ -922,18 +822,11 @@ M24srError_t M24srDriver::update_binary(uint16_t offset, uint8_t length, const u
     _last_command_data.length = length;
     _last_command_data.offset = offset;
 
-    if (_communication_type == SYNC) {
-        status = io_poll_i2c();
-        if (status == M24SR_SUCCESS) {
-            return receive_update_binary();
-        } else {
-            _last_command = NONE;
-            get_callback()->on_updated_binary(this, status, offset, (uint8_t*) data, length);
-            return status;
-        }
+    if (!manage_sync_communication(&status)) {
+        get_callback()->on_updated_binary(this, status, offset, (uint8_t*) data, length);
     }
 
-    return M24SR_SUCCESS;
+    return status;
 }
 
 M24srError_t M24srDriver::receive_update_binary() {
@@ -978,7 +871,6 @@ M24srError_t M24srDriver::receive_update_binary() {
  * @retval M24SR_ERROR_I2CTIMEOUT I2C timeout occurred.
  */
 M24srError_t M24srDriver::verify(PasswordType_t password_type, const uint8_t *password) {
-    C_APDU command;
     M24srError_t status;
     uint16_t length;
 
@@ -988,25 +880,19 @@ M24srError_t M24srDriver::verify(PasswordType_t password_type, const uint8_t *pa
         return M24SR_IO_ERROR_PARAMETER;
     }
 
-    /* build the command */
-    command.header.CLA = C_APDU_CLA_DEFAULT;
-    command.header.INS = C_APDU_VERIFY;
-    /* copy the Password Id */
-    command.header.P1 = GETMSB(password_type);
-    command.header.P2 = GETLSB(password_type);
-    /* copy the number of bytes of the data field */
-    command.body.LC = password ? PASSWORD_LENGTH : 0;
+    C_APDU command(C_APDU_CLA_DEFAULT, C_APDU_VERIFY, password_type, password ? PASSWORD_LENGTH : 0, NULL , 0);
+
+    uint16_t command_mask = CMD_MASK_VERIFYBINARYWOPWD;
 
     if (password) {
         /* copy the password */
         command.body.data = password;
         /* build the I2C command */
-        build_I_block_command(CMD_MASK_VERIFYBINARYWITHPWD, &command, _did_byte, &length, _buffer);
-    } else {
-        command.body.data = NULL;
-        /* build the I2C command */
-        build_I_block_command(CMD_MASK_VERIFYBINARYWOPWD, &command, _did_byte, &length, _buffer);
+        command_mask = CMD_MASK_VERIFYBINARYWITHPWD;
     }
+
+    /* build the I2C command */
+    build_I_block_command(command_mask, &command, _did_byte, &length, _buffer);
 
     /* send the request */
     status = io_send_i2c_command(length, _buffer);
@@ -1018,18 +904,11 @@ M24srError_t M24srDriver::verify(PasswordType_t password_type, const uint8_t *pa
     _last_command_data.data = (uint8_t*) password;
     _last_command_data.offset = password_type;
 
-    if (_communication_type == SYNC) {
-        status = io_poll_i2c();
-        if (status == M24SR_SUCCESS) {
-            return receive_verify();
-        } else {
-            _last_command = NONE;
-            get_callback()->on_verified(this, status, password_type, password);
-            return status;
-        }
+    if (!manage_sync_communication(&status)) {
+        get_callback()->on_verified(this, status, password_type, password);
     }
 
-    return M24SR_SUCCESS;
+    return status;
 }
 
 M24srError_t M24srDriver::receive_verify() {
@@ -1060,7 +939,6 @@ M24srError_t M24srDriver::receive_verify() {
  * @retval M24SR_ERROR_I2CTIMEOUT I2C timeout occurred.
  */
 M24srError_t M24srDriver::change_reference_data(PasswordType_t password_type, const uint8_t *password) {
-    C_APDU command;
     M24srError_t status;
     uint16_t length;
 
@@ -1070,16 +948,8 @@ M24srError_t M24srDriver::change_reference_data(PasswordType_t password_type, co
         return M24SR_IO_ERROR_PARAMETER;
     }
 
-    /* build the command */
-    command.header.CLA = C_APDU_CLA_DEFAULT;
-    command.header.INS = C_APDU_CHANGE;
-    /* copy the Password Id */
-    command.header.P1 = GETMSB(password_type);
-    command.header.P2 = GETLSB(password_type);
-    /* copy the number of byte of the data field */
-    command.body.LC = PASSWORD_LENGTH;
-    /* copy the password */
-    command.body.data = password;
+    C_APDU command(C_APDU_CLA_DEFAULT, C_APDU_CHANGE, password_type, PASSWORD_LENGTH, password, 0);
+
     /* build the command */
     build_I_block_command(CMD_MASK_CHANGEREFDATA, &command, _did_byte, &length, _buffer);
 
@@ -1095,18 +965,11 @@ M24srError_t M24srDriver::change_reference_data(PasswordType_t password_type, co
     /* use the offset filed for store the pwd type */
     _last_command_data.offset = (uint8_t) password_type;
 
-    if (_communication_type == SYNC) {
-        status = io_poll_i2c();
-        if (status == M24SR_SUCCESS) {
-            return receive_change_reference_data();
-        } else {
-            _last_command = NONE;
-            get_callback()->on_change_reference_data(this, status, password_type, password);
-            return status;
-        }
+    if (!manage_sync_communication(&status)) {
+        get_callback()->on_change_reference_data(this, status, password_type, password);
     }
 
-    return M24SR_SUCCESS;
+    return status;
 }
 
 M24srError_t M24srDriver::receive_change_reference_data() {
@@ -1134,23 +997,17 @@ M24srError_t M24srDriver::receive_change_reference_data() {
  * @retval M24SR_ERROR_I2CTIMEOUT I2C timeout occurred.
  */
 M24srError_t M24srDriver::enable_verification_requirement(PasswordType_t password_type) {
-    C_APDU command;
     M24srError_t status;
     uint16_t length;
 
     /* check the parameters */
     if ((password_type != READ_PASSWORD) && (password_type != WRITE_PASSWORD)) {
-        get_callback()->on_enable_verification_requirement(this, M24SR_IO_ERROR_PARAMETER,
-                                                           password_type);
+        get_callback()->on_enable_verification_requirement(this, M24SR_IO_ERROR_PARAMETER, password_type);
         return M24SR_IO_ERROR_PARAMETER;
     }
 
-    /* build the command */
-    command.header.CLA = C_APDU_CLA_DEFAULT;
-    command.header.INS = C_APDU_ENABLE;
-    /* copy the Password Id */
-    command.header.P1 = GETMSB(password_type);
-    command.header.P2 = GETLSB(password_type);
+    C_APDU command(C_APDU_CLA_DEFAULT, C_APDU_ENABLE, password_type, 0, NULL, 0);
+
     /* build the I2C command */
     build_I_block_command(CMD_MASK_ENABLEVERIFREQ, &command, _did_byte, &length, _buffer);
 
@@ -1165,18 +1022,11 @@ M24srError_t M24srDriver::enable_verification_requirement(PasswordType_t passwor
     //use the offset filed for store the pwd id;
     _last_command_data.offset = (uint8_t) password_type;
 
-    if (_communication_type == SYNC) {
-        status = io_poll_i2c();
-        if (status == M24SR_SUCCESS) {
-            return receive_enable_verification_requirement();
-        } else {
-            _last_command = NONE;
-            get_callback()->on_enable_verification_requirement(this, status, password_type);
-            return status;
-        }
+    if (!manage_sync_communication(&status)) {
+        get_callback()->on_enable_verification_requirement(this, status, password_type);
     }
 
-    return M24SR_SUCCESS;
+    return status;
 }
 
 M24srError_t M24srDriver::receive_enable_verification_requirement() {
@@ -1203,7 +1053,6 @@ M24srError_t M24srDriver::receive_enable_verification_requirement() {
  * @retval M24SR_ERROR_I2CTIMEOUT I2C timeout occurred.
  */
 M24srError_t M24srDriver::disable_verification_requirement(PasswordType_t password_type) {
-    C_APDU command;
     M24srError_t status;
     uint16_t length;
 
@@ -1213,12 +1062,8 @@ M24srError_t M24srDriver::disable_verification_requirement(PasswordType_t passwo
         return M24SR_IO_ERROR_PARAMETER;
     }
 
-    /* build the command */
-    command.header.CLA = C_APDU_CLA_DEFAULT;
-    command.header.INS = C_APDU_DISABLE;
-    /* copy the Password Id */
-    command.header.P1 = GETMSB(password_type);
-    command.header.P2 = GETLSB(password_type);
+    C_APDU command(C_APDU_CLA_DEFAULT, C_APDU_DISABLE, password_type, 0, NULL, 0);
+
     /* build the command */
     build_I_block_command(CMD_MASK_DISABLEVERIFREQ, &command, _did_byte, &length, _buffer);
 
@@ -1233,18 +1078,11 @@ M24srError_t M24srDriver::disable_verification_requirement(PasswordType_t passwo
     //use the offset filed for store the pwd id;
     _last_command_data.offset = (uint8_t) password_type;
 
-    if (_communication_type == SYNC) {
-        status = io_poll_i2c();
-        if (status == M24SR_SUCCESS) {
-            return receive_disable_verification_requirement();
-        } else {
-            _last_command = NONE;
-            get_callback()->on_disable_verification_requirement(this, status, password_type);
-            return status;
-        }
+    if (!manage_sync_communication(&status)) {
+        get_callback()->on_disable_verification_requirement(this, status, password_type);
     }
 
-    return M24SR_SUCCESS;
+    return status;
 }
 
 M24srError_t M24srDriver::receive_disable_verification_requirement() {
@@ -1271,7 +1109,6 @@ M24srError_t M24srDriver::receive_disable_verification_requirement() {
  * @retval M24SR_ERROR_I2CTIMEOUT I2C timeout occurred.
  */
 M24srError_t M24srDriver::enable_permanent_state(PasswordType_t password_type) {
-    C_APDU command;
     M24srError_t status;
     uint16_t length;
 
@@ -1281,12 +1118,8 @@ M24srError_t M24srDriver::enable_permanent_state(PasswordType_t password_type) {
         return M24SR_IO_ERROR_PARAMETER;
     }
 
-    /* build the command */
-    command.header.CLA = C_APDU_CLA_ST;
-    command.header.INS = C_APDU_ENABLE;
-    /* copy the Password Id */
-    command.header.P1 = GETMSB(password_type);
-    command.header.P2 = GETLSB(password_type);
+    C_APDU command(C_APDU_CLA_ST, C_APDU_ENABLE, password_type, 0, NULL, 0);
+
     /* build the I2C command */
     build_I_block_command(CMD_MASK_ENABLEVERIFREQ, &command, _did_byte, &length, _buffer);
 
@@ -1301,18 +1134,11 @@ M24srError_t M24srDriver::enable_permanent_state(PasswordType_t password_type) {
     //use the offset filed for store the pwd id;
     _last_command_data.offset = (uint8_t) password_type;
 
-    if (_communication_type == SYNC) {
-        status = io_poll_i2c();
-        if (status == M24SR_SUCCESS) {
-            return receive_enable_permanent_state();
-        } else {
-            _last_command = NONE;
-            get_callback()->on_enable_permanent_state(this, status, password_type);
-            return status;
-        }
+    if (!manage_sync_communication(&status)) {
+        get_callback()->on_enable_permanent_state(this, status, password_type);
     }
 
-    return M24SR_SUCCESS;
+    return status;
 }
 
 M24srError_t M24srDriver::receive_enable_permanent_state() {
@@ -1339,7 +1165,6 @@ M24srError_t M24srDriver::receive_enable_permanent_state() {
  * @retval M24SR_ERROR_I2CTIMEOUT I2C timeout occurred.
  */
 M24srError_t M24srDriver::disable_permanent_state(PasswordType_t password_type) {
-    C_APDU command;
     M24srError_t status;
     uint16_t length;
 
@@ -1349,12 +1174,8 @@ M24srError_t M24srDriver::disable_permanent_state(PasswordType_t password_type) 
         return M24SR_IO_ERROR_PARAMETER;
     }
 
-    /* build the command */
-    command.header.CLA = C_APDU_CLA_ST;
-    command.header.INS = C_APDU_DISABLE;
-    /* copy the Password Id */
-    command.header.P1 = GETMSB(password_type);
-    command.header.P2 = GETLSB(password_type);
+    C_APDU command(C_APDU_CLA_ST, C_APDU_DISABLE, password_type, 0, NULL, 0);
+
     /* build the I2C command */
     build_I_block_command(CMD_MASK_DISABLEVERIFREQ, &command, _did_byte, &length, _buffer);
 
@@ -1369,18 +1190,11 @@ M24srError_t M24srDriver::disable_permanent_state(PasswordType_t password_type) 
     //use the offset filed for store the pwd id;
     _last_command_data.offset = (uint8_t) password_type;
 
-    if (_communication_type == SYNC) {
-        status = io_poll_i2c();
-        if (status == M24SR_SUCCESS) {
-            return receive_disable_permanent_state();
-        } else {
-            _last_command = NONE;
-            get_callback()->on_disable_permanent_state(this, status, password_type);
-            return status;
-        }
+    if (!manage_sync_communication(&status)) {
+        get_callback()->on_disable_permanent_state(this, status, password_type);
     }
 
-    return M24SR_SUCCESS;
+    return status;
 }
 
 M24srError_t M24srDriver::receive_disable_permanent_state() {
@@ -1406,21 +1220,16 @@ M24srError_t M24srDriver::receive_disable_permanent_state() {
  * @retval M24SR_ERROR_I2CTIMEOUT I2C timeout occurred.
  */
 M24srError_t M24srDriver::send_interrupt() {
-    C_APDU command;
     uint16_t length;
+    uint16_t P1_P2 = 0x001E;
 
     M24srError_t status = manage_i2c_gpo(INTERRUPT);
     if (status != M24SR_SUCCESS) {
         return status;
     }
 
-    /* build the command */
-    command.header.CLA = C_APDU_CLA_ST;
-    command.header.INS = C_APDU_INTERRUPT;
-    /* copy the Password Id */
-    command.header.P1 = 0x00;
-    command.header.P2 = 0x1E;
-    command.body.LC = 0x00;
+    C_APDU command(C_APDU_CLA_ST, C_APDU_INTERRUPT, P1_P2, 0, NULL, 0);
+
     /* build the I2C command */
     build_I_block_command(CMD_MASK_SENDINTERRUPT, &command, _did_byte, &length, _buffer);
 
@@ -1454,8 +1263,8 @@ M24srError_t M24srDriver::send_receive_i2c(uint16_t length, uint8_t *buffer) {
  * @retval M24SR_ERROR_I2CTIMEOUT I2C timeout occurred.
  */
 M24srError_t M24srDriver::state_control(bool gpo_reset) {
-    C_APDU command;
     uint16_t length;
+    uint16_t P1_P2 = 0x001F;
 
     M24srError_t status = manage_i2c_gpo(STATE_CONTROL);
     if (status == M24SR_SUCCESS) {
@@ -1464,14 +1273,8 @@ M24srError_t M24srDriver::state_control(bool gpo_reset) {
 
     uint8_t reset = (uint8_t)gpo_reset;
 
-    /* build the command */
-    command.header.CLA = C_APDU_CLA_ST;
-    command.header.INS = C_APDU_INTERRUPT;
-    /* copy the Password Id */
-    command.header.P1 = 0x00;
-    command.header.P2 = 0x1F;
-    command.body.LC = 0x01;
-    command.body.data = &reset;
+    C_APDU command(C_APDU_CLA_ST, C_APDU_INTERRUPT, P1_P2, 1, &reset, 0);
+
     /* build the I2C command */
     build_I_block_command(CMD_MASK_GPOSTATE, &command, _did_byte, &length, _buffer);
 

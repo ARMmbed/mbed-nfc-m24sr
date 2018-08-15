@@ -88,7 +88,8 @@ typedef struct {
 /**
  * @brief APDU Command structure
  */
-typedef struct {
+class C_APDU {
+public:
     typedef struct {
         uint8_t CLA; /**< Command class */
         uint8_t INS; /**< Operation code */
@@ -102,9 +103,19 @@ typedef struct {
         uint8_t LE; /**< Expected length of data to be returned */
     } C_APDUBody_t;
 
+    C_APDU(uint8_t cla, uint8_t ins, uint16_t p1p2, uint8_t length, const uint8_t* data, uint8_t expected) {
+        header.CLA = cla;
+        header.INS = ins;
+        header.P1 = (uint8_t)((p1p2 & 0xFF00)>>8);
+        header.P2 = (uint8_t)(p1p2 & 0x00FF);
+        body.LC = length;
+        body.data = data;
+        body.LE = expected;
+    }
+
     C_APDUHeader_t header;
     C_APDUBody_t body;
-} C_APDU;
+};
 
 /**
  * @brief SC response structure
@@ -792,6 +803,8 @@ private:
      * @return M24SR_SUCCESS if no errors
      */
     M24srError_t io_poll_i2c();
+
+    bool manage_sync_communication(M24srError_t *status);
 
 private:
     /**
