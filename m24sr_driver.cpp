@@ -80,7 +80,7 @@ namespace ST {
 /* length */
 #define STATUS_LENGTH                    2
 #define CRC_LENGTH                       2
-#define STATUSRESPONSE_LENGTH            5
+#define STATUS_RESPONSE_LENGTH           5
 #define DESELECT_RESPONSE_LENGTH         3
 #define WATING_TIME_EXT_RESPONSE_LENGTH  4
 #define PASSWORD_LENGTH                  16
@@ -89,18 +89,18 @@ namespace ST {
 #define SELECT_APPLICATION_COMMAND   {0xD2,0x76,0x00,0x00,0x85,0x01,0x01}
 
 /* command structure mask */
-#define CMD_MASK_SELECTAPPLICATION    0x01FF
-#define CMD_MASK_SELECTCCFILE         0x017F
-#define CMD_MASK_SELECTNDEFFILE       0x017F
-#define CMD_MASK_READBINARY           0x019F
-#define CMD_MASK_UPDATEBINARY         0x017F
-#define CMD_MASK_VERIFYBINARYWOPWD    0x013F
-#define CMD_MASK_VERIFYBINARYWITHPWD  0x017F
-#define CMD_MASK_CHANGEREFDATA        0x017F
-#define CMD_MASK_ENABLEVERIFREQ       0x011F
-#define CMD_MASK_DISABLEVERIFREQ      0x011F
-#define CMD_MASK_SENDINTERRUPT        0x013F
-#define CMD_MASK_GPOSTATE             0x017F
+#define CMD_MASK_SELECT_APPLICATION     0x01FF
+#define CMD_MASK_SELECT_CC_FILE         0x017F
+#define CMD_MASK_SELECT_NDEF_FILE       0x017F
+#define CMD_MASK_READ_BINARY            0x019F
+#define CMD_MASK_UPDATE_BINARY          0x017F
+#define CMD_MASK_VERIFY_BINARY_WO_PWD   0x013F
+#define CMD_MASK_VERIFY_BINARY_WITH_PWD 0x017F
+#define CMD_MASK_CHANGE_REF_DATA        0x017F
+#define CMD_MASK_ENABLE_VERIFREQ        0x011F
+#define CMD_MASK_DISABLE_VERIFREQ       0x011F
+#define CMD_MASK_SEND_INTERRUPT         0x013F
+#define CMD_MASK_GPO_STATE              0x017F
 
 /* command structure values for the mask */
 #define PCB_NEEDED                0x0001      /* PCB byte present or not */
@@ -122,9 +122,9 @@ namespace ST {
 
 /*  mask */
 #define MASK_BLOCK                0xC0
-#define MASK_IBLOCK               0x00
-#define MASK_RBLOCK               0x80
-#define MASK_SBLOCK               0xC0
+#define MASK_I_BLOCK              0x00
+#define MASK_R_BLOCK              0x80
+#define MASK_S_BLOCK              0xC0
 
 #define GETMSB(val)               ((uint8_t) ((val & 0xFF00)>>8))
 #define GETLSB(val)               ((uint8_t) (val & 0x00FF))
@@ -153,7 +153,7 @@ static uint16_t update_crc(uint8_t ch, uint16_t *lpw_crc) {
  */
 static uint16_t compute_crc(uint8_t *data, uint8_t length) {
     uint8_t block;
-    uint16_t crc16 = 0x6363; // ITU-V.41
+    uint16_t crc16 = 0x6363; /* ITU-V.41 */
 
     do {
         block = *data++;
@@ -165,14 +165,15 @@ static uint16_t compute_crc(uint8_t *data, uint8_t length) {
 
 /**  
  * @brief This function computes the CRC16 residue as defined by CRC ISO/IEC 13239
- * @param DataIn         input data
- * @param Length         Number of bits of DataIn
- * @retval Status (SW1&SW2)       CRC16 residue is correct
- * @retval M24SR_ERROR_CRC       CRC16 residue is false
+ * @param data input data
+ * @param length Number of bits of DataIn
+ * @retval Status (SW1&SW2) CRC16 residue is correct
+ * @retval M24SR_ERROR_CRC CRC16 residue is false
  */
 static M24srError_t is_correct_crc_residue(uint8_t *data, uint8_t length) {
     uint16_t res_crc = 0x0000;
     M24srError_t status;
+
     /* check the CRC16 Residue */
     if (length != 0) {
         res_crc = compute_crc(data, length);
@@ -193,6 +194,7 @@ static M24srError_t is_correct_crc_residue(uint8_t *data, uint8_t length) {
             status = (M24srError_t) (((data[1] << 8) & 0xFF00) | (data[2] & 0x00FF));
         }
     }
+
     if (status == NFC_COMMAND_SUCCESS) {
         status = M24SR_SUCCESS;
     }
@@ -284,7 +286,7 @@ static void build_I_block_command(uint16_t command_mask, C_APDU *command, uint8_
  * @retval NFC_ERROR      the data is not a S-Block
  */
 static M24srError_t is_S_block(uint8_t *buffer) {
-    if ((buffer[OFFSET_PCB] & MASK_BLOCK) == MASK_SBLOCK) {
+    if ((buffer[OFFSET_PCB] & MASK_BLOCK) == MASK_S_BLOCK) {
         return M24SR_SUCCESS;
     } else {
         return M24SR_ERROR;
@@ -306,9 +308,11 @@ M24srDriver::M24srDriver()
       _is_session_open(false) {
     memset(_buffer, 0, 0xFF);
     _did_byte = 0;
+
     if (_rf_disable_pin.is_connected() != 0) {
         _rf_disable_pin = 0;
     }
+
     if (_gpo_pin.is_connected() != 0) {
         _gpo_event_interrupt.fall(&nfc_interrupt_callback);
         _gpo_event_interrupt.mode(PullUp);
@@ -321,14 +325,14 @@ M24srDriver::M24srDriver()
  * @return M24SR_SUCCESS if no errors
  */
 M24srError_t M24srDriver::init() {
-    //force to open a i2c session
+    /* force to open a i2c session */
     M24srError_t status = get_session(true);
 
     if (status != M24SR_SUCCESS) {
         return status;
     }
 
-    //leave the gpo always up
+    /* leave the gpo always up */
     if (_gpo_pin.is_connected() != 0) {
         status = manage_i2c_gpo(HIGH_IMPEDANCE);
         if (status != M24SR_SUCCESS)
@@ -341,7 +345,7 @@ M24srError_t M24srDriver::init() {
             return status;
     }
 
-    //close the session
+    /* close the session */
     status = deselect();
 
     if (status != M24SR_SUCCESS) {
@@ -370,6 +374,7 @@ bool M24srDriver::manage_sync_communication(M24srError_t *status) {
             return false;
         }
     }
+
     return true;
 }
 
@@ -379,7 +384,7 @@ bool M24srDriver::manage_sync_communication(M24srError_t *status) {
  * @return M24SR_SUCCESS if no errors
  */
 M24srError_t M24srDriver::send_fwt_extension(uint8_t fwt_byte) {
-    uint8_t buffer[STATUSRESPONSE_LENGTH];
+    uint8_t buffer[STATUS_RESPONSE_LENGTH];
     M24srError_t status;
     uint8_t length = 0;
     uint16_t crc16;
@@ -488,7 +493,7 @@ M24srError_t M24srDriver::select_application() {
     C_APDU command(C_APDU_CLA_DEFAULT, C_APDU_SELECT_FILE, P1_P2, sizeof(data_out), data_out, 0);
 
     /* build the I2C command */
-    build_I_block_command(CMD_MASK_SELECTAPPLICATION, &command, _did_byte, &length, _buffer);
+    build_I_block_command(CMD_MASK_SELECT_APPLICATION, &command, _did_byte, &length, _buffer);
 
     /* send the request */
     status = io_send_i2c_command(length, _buffer);
@@ -507,7 +512,7 @@ M24srError_t M24srDriver::select_application() {
 }
 
 M24srError_t M24srDriver::receive_select_application() {
-    uint8_t data_in[STATUSRESPONSE_LENGTH];
+    uint8_t data_in[STATUS_RESPONSE_LENGTH];
     M24srError_t status;
 
     _last_command = NONE;
@@ -517,6 +522,7 @@ M24srError_t M24srDriver::receive_select_application() {
         get_callback()->on_selected_application(this, status);
         return status;
     }
+
     status = is_correct_crc_residue(data_in, sizeof(data_in));
     get_callback()->on_selected_application(this, status);
 
@@ -528,11 +534,9 @@ M24srError_t M24srDriver::read_id(uint8_t *nfc_id) {
         return M24SR_ERROR;
     }
 
-    //enable the callback for change the gpo
     _component_cb = &_read_id_cb;
     _read_id_cb.set_task(nfc_id);
 
-    //start the readID procedure
     return select_application();
 }
 
@@ -551,7 +555,7 @@ M24srError_t M24srDriver::select_cc_file() {
     C_APDU command(C_APDU_CLA_DEFAULT, C_APDU_SELECT_FILE, P1_P2, sizeof(data_out), data_out, 0);
 
     /* build the I2C command */
-    build_I_block_command(CMD_MASK_SELECTCCFILE, &command, _did_byte, &length, _buffer);
+    build_I_block_command(CMD_MASK_SELECT_CC_FILE, &command, _did_byte, &length, _buffer);
 
     /* send the request */
     status = io_send_i2c_command(length, _buffer);
@@ -570,7 +574,7 @@ M24srError_t M24srDriver::select_cc_file() {
 }
 
 M24srError_t M24srDriver::receive_select_cc_file() {
-    uint8_t data_in[STATUSRESPONSE_LENGTH];
+    uint8_t data_in[STATUS_RESPONSE_LENGTH];
     M24srError_t status;
 
     _last_command = NONE;
@@ -602,7 +606,7 @@ M24srError_t M24srDriver::select_system_file() {
     C_APDU command(C_APDU_CLA_DEFAULT, C_APDU_SELECT_FILE, P1_P2, sizeof(data_out), data_out, 0);
 
     /* build the command */
-    build_I_block_command(CMD_MASK_SELECTCCFILE, &command, _did_byte, &length, _buffer);
+    build_I_block_command(CMD_MASK_SELECT_CC_FILE, &command, _did_byte, &length, _buffer);
 
     /* send the request */
     status = io_send_i2c_command(length, _buffer);
@@ -621,7 +625,7 @@ M24srError_t M24srDriver::select_system_file() {
 }
 
 M24srError_t M24srDriver::receive_select_system_file() {
-    uint8_t data_in[STATUSRESPONSE_LENGTH];
+    uint8_t data_in[STATUS_RESPONSE_LENGTH];
     M24srError_t status;
 
     _last_command = NONE;
@@ -653,13 +657,14 @@ M24srError_t M24srDriver::select_ndef_file(uint16_t ndef_file_id) {
     C_APDU command(C_APDU_CLA_DEFAULT, C_APDU_SELECT_FILE, P1_P2, sizeof(data_out), data_out, 0);
 
     /* build the I2C command */
-    build_I_block_command(CMD_MASK_SELECTNDEFFILE, &command, _did_byte, &length, _buffer);
+    build_I_block_command(CMD_MASK_SELECT_NDEF_FILE, &command, _did_byte, &length, _buffer);
 
     /* send the request */
     status = io_send_i2c_command(length, _buffer);
     if (status != M24SR_SUCCESS) {
         return status;
     }
+
     _last_command = SELECT_NDEF_FILE;
 
     if (!manage_sync_communication(&status)) {
@@ -670,7 +675,7 @@ M24srError_t M24srDriver::select_ndef_file(uint16_t ndef_file_id) {
 }
 
 M24srError_t M24srDriver::receive_select_ndef_file() {
-    uint8_t data_in[STATUSRESPONSE_LENGTH];
+    uint8_t data_in[STATUS_RESPONSE_LENGTH];
     M24srError_t status;
 
     _last_command = NONE;
@@ -700,14 +705,13 @@ M24srError_t M24srDriver::read_binary(uint16_t offset, uint8_t length, uint8_t *
     uint16_t command_length;
     M24srError_t status;
 
-    //clamp the buffer to the max size
     if (length > MAX_OPERATION_SIZE) {
         length = MAX_OPERATION_SIZE;
     }
 
     C_APDU command(C_APDU_CLA_DEFAULT, C_APDU_READ_BINARY, offset, 0, NULL, length);
 
-    build_I_block_command(CMD_MASK_READBINARY, &command, _did_byte, &command_length, _buffer);
+    build_I_block_command(CMD_MASK_READ_BINARY, &command, _did_byte, &command_length, _buffer);
 
     status = io_send_i2c_command(command_length, _buffer);
     if (status != M24SR_SUCCESS) {
@@ -735,12 +739,13 @@ M24srError_t M24srDriver::receive_read_binary() {
 
     _last_command = NONE;
 
-    status = io_receive_i2c_response(length + STATUSRESPONSE_LENGTH, _buffer);
+    status = io_receive_i2c_response(length + STATUS_RESPONSE_LENGTH, _buffer);
     if (status != M24SR_SUCCESS) {
         get_callback()->on_read_byte(this, status, offset, data, length);
         return status;
     }
-    status = is_correct_crc_residue(_buffer, length + STATUSRESPONSE_LENGTH);
+
+    status = is_correct_crc_residue(_buffer, length + STATUS_RESPONSE_LENGTH);
     if (status != M24SR_SUCCESS) {
         get_callback()->on_read_byte(this, status, offset, data, length);
     } else {
@@ -764,14 +769,13 @@ M24srError_t M24srDriver::st_read_binary(uint16_t offset, uint8_t length, uint8_
     uint16_t command_length;
     M24srError_t status;
 
-    //clamp the buffer to the max size
     if (length > MAX_OPERATION_SIZE) {
         length = MAX_OPERATION_SIZE;
     }
 
     C_APDU command(C_APDU_CLA_ST, C_APDU_READ_BINARY, offset, 0, NULL, length);
 
-    build_I_block_command(CMD_MASK_READBINARY, &command, _did_byte, &command_length, _buffer);
+    build_I_block_command(CMD_MASK_READ_BINARY, &command, _did_byte, &command_length, _buffer);
 
     status = io_send_i2c_command(command_length, _buffer);
     if (status != M24SR_SUCCESS) {
@@ -802,14 +806,13 @@ M24srError_t M24srDriver::update_binary(uint16_t offset, uint8_t length, const u
     M24srError_t status;
     uint16_t command_length;
 
-    //clamp the buffer to the max size
     if (length > MAX_OPERATION_SIZE) {
         length = MAX_OPERATION_SIZE;
     }
 
     C_APDU command(C_APDU_CLA_DEFAULT, C_APDU_UPDATE_BINARY, offset, length, data, 0);
 
-    build_I_block_command(CMD_MASK_UPDATEBINARY, &command, _did_byte, &command_length, _buffer);
+    build_I_block_command(CMD_MASK_UPDATE_BINARY, &command, _did_byte, &command_length, _buffer);
 
     status = io_send_i2c_command(command_length, _buffer);
     if (status != M24SR_SUCCESS) {
@@ -830,7 +833,7 @@ M24srError_t M24srDriver::update_binary(uint16_t offset, uint8_t length, const u
 }
 
 M24srError_t M24srDriver::receive_update_binary() {
-    uint8_t response[STATUSRESPONSE_LENGTH];
+    uint8_t response[STATUS_RESPONSE_LENGTH];
     M24srError_t status;
     const uint16_t length = _last_command_data.length;
     uint8_t *data = _last_command_data.data;
@@ -847,16 +850,16 @@ M24srError_t M24srDriver::receive_update_binary() {
     if (is_S_block(response) == M24SR_SUCCESS) {
         /* check the CRC */
         status = is_correct_crc_residue(response, WATING_TIME_EXT_RESPONSE_LENGTH);
-        // TODO: why if we check ==NFC_Commandsuccess it fail?
         if (status != M24SR_IO_ERROR_CRC) {
             /* send the FrameExension response*/
             status = send_fwt_extension(response[OFFSET_PCB + 1]);
-            if (status != M24SR_SUCCESS) { //something get wrong -> abort the update
+            if (status != M24SR_SUCCESS) {
+                /* abort update */
                 get_callback()->on_updated_binary(this, status, offset, data, length);
             }
         }
     } else {
-        status = is_correct_crc_residue(response, STATUSRESPONSE_LENGTH);
+        status = is_correct_crc_residue(response, STATUS_RESPONSE_LENGTH);
         get_callback()->on_updated_binary(this, status, offset, data, length);
     }
 
@@ -882,13 +885,13 @@ M24srError_t M24srDriver::verify(PasswordType_t password_type, const uint8_t *pa
 
     C_APDU command(C_APDU_CLA_DEFAULT, C_APDU_VERIFY, password_type, password ? PASSWORD_LENGTH : 0, NULL , 0);
 
-    uint16_t command_mask = CMD_MASK_VERIFYBINARYWOPWD;
+    uint16_t command_mask = CMD_MASK_VERIFY_BINARY_WO_PWD;
 
     if (password) {
         /* copy the password */
         command.body.data = password;
         /* build the I2C command */
-        command_mask = CMD_MASK_VERIFYBINARYWITHPWD;
+        command_mask = CMD_MASK_VERIFY_BINARY_WITH_PWD;
     }
 
     /* build the I2C command */
@@ -900,8 +903,10 @@ M24srError_t M24srDriver::verify(PasswordType_t password_type, const uint8_t *pa
         get_callback()->on_verified(this, status, password_type, password);
         return status;
     }
+
     _last_command = VERIFY;
     _last_command_data.data = (uint8_t*) password;
+    /* use the offset to store the password type */
     _last_command_data.offset = password_type;
 
     if (!manage_sync_communication(&status)) {
@@ -913,7 +918,7 @@ M24srError_t M24srDriver::verify(PasswordType_t password_type, const uint8_t *pa
 
 M24srError_t M24srDriver::receive_verify() {
     M24srError_t status;
-    uint8_t respBuffer[STATUSRESPONSE_LENGTH];
+    uint8_t respBuffer[STATUS_RESPONSE_LENGTH];
     _last_command = NONE;
 
     const uint8_t *data = _last_command_data.data;
@@ -926,7 +931,7 @@ M24srError_t M24srDriver::receive_verify() {
         return status;
     }
 
-    status = is_correct_crc_residue(respBuffer, STATUSRESPONSE_LENGTH);
+    status = is_correct_crc_residue(respBuffer, STATUS_RESPONSE_LENGTH);
     get_callback()->on_verified(this, status, type, data);
     return status;
 }
@@ -951,7 +956,7 @@ M24srError_t M24srDriver::change_reference_data(PasswordType_t password_type, co
     C_APDU command(C_APDU_CLA_DEFAULT, C_APDU_CHANGE, password_type, PASSWORD_LENGTH, password, 0);
 
     /* build the command */
-    build_I_block_command(CMD_MASK_CHANGEREFDATA, &command, _did_byte, &length, _buffer);
+    build_I_block_command(CMD_MASK_CHANGE_REF_DATA, &command, _did_byte, &length, _buffer);
 
     /* send the request */
     status = io_send_i2c_command(length, _buffer);
@@ -962,8 +967,8 @@ M24srError_t M24srDriver::change_reference_data(PasswordType_t password_type, co
 
     _last_command = CHANGE_REFERENCE_DATA;
     _last_command_data.data = (uint8_t*) password;
-    /* use the offset filed for store the pwd type */
-    _last_command_data.offset = (uint8_t) password_type;
+    /* use the offset to store the password type */
+    _last_command_data.offset = password_type;
 
     if (!manage_sync_communication(&status)) {
         get_callback()->on_change_reference_data(this, status, password_type, password);
@@ -974,18 +979,18 @@ M24srError_t M24srDriver::change_reference_data(PasswordType_t password_type, co
 
 M24srError_t M24srDriver::receive_change_reference_data() {
     M24srError_t status;
-    uint8_t rensponse[STATUSRESPONSE_LENGTH];
+    uint8_t rensponse[STATUS_RESPONSE_LENGTH];
 
     PasswordType_t type = PasswordType_t(_last_command_data.offset);
     uint8_t *data = _last_command_data.data;
 
-    status = io_receive_i2c_response(STATUSRESPONSE_LENGTH, rensponse);
+    status = io_receive_i2c_response(STATUS_RESPONSE_LENGTH, rensponse);
     if (status != M24SR_SUCCESS) {
         get_callback()->on_change_reference_data(this, status, type, data);
         return status;
     }
 
-    status = is_correct_crc_residue(rensponse, STATUSRESPONSE_LENGTH);
+    status = is_correct_crc_residue(rensponse, STATUS_RESPONSE_LENGTH);
     get_callback()->on_change_reference_data(this, status, type, data);
     return status;
 }
@@ -1009,7 +1014,7 @@ M24srError_t M24srDriver::enable_verification_requirement(PasswordType_t passwor
     C_APDU command(C_APDU_CLA_DEFAULT, C_APDU_ENABLE, password_type, 0, NULL, 0);
 
     /* build the I2C command */
-    build_I_block_command(CMD_MASK_ENABLEVERIFREQ, &command, _did_byte, &length, _buffer);
+    build_I_block_command(CMD_MASK_ENABLE_VERIFREQ, &command, _did_byte, &length, _buffer);
 
     /* send the request */
     status = io_send_i2c_command(length, _buffer);
@@ -1019,8 +1024,8 @@ M24srError_t M24srDriver::enable_verification_requirement(PasswordType_t passwor
     }
 
     _last_command = ENABLE_VERIFICATION_REQUIREMENT;
-    //use the offset filed for store the pwd id;
-    _last_command_data.offset = (uint8_t) password_type;
+    /* use the offset to store the password type */
+    _last_command_data.offset = password_type;
 
     if (!manage_sync_communication(&status)) {
         get_callback()->on_enable_verification_requirement(this, status, password_type);
@@ -1031,17 +1036,17 @@ M24srError_t M24srDriver::enable_verification_requirement(PasswordType_t passwor
 
 M24srError_t M24srDriver::receive_enable_verification_requirement() {
     M24srError_t status;
-    uint8_t rensponse[STATUSRESPONSE_LENGTH];
+    uint8_t rensponse[STATUS_RESPONSE_LENGTH];
 
     PasswordType_t type = PasswordType_t(_last_command_data.offset);
 
-    status = io_receive_i2c_response(STATUSRESPONSE_LENGTH, rensponse);
+    status = io_receive_i2c_response(STATUS_RESPONSE_LENGTH, rensponse);
     if (status != M24SR_SUCCESS) {
         get_callback()->on_enable_verification_requirement(this, status, type);
         return status;
     }
 
-    status = is_correct_crc_residue(rensponse, STATUSRESPONSE_LENGTH);
+    status = is_correct_crc_residue(rensponse, STATUS_RESPONSE_LENGTH);
     get_callback()->on_enable_verification_requirement(this, status, type);
     return status;
 }
@@ -1065,7 +1070,7 @@ M24srError_t M24srDriver::disable_verification_requirement(PasswordType_t passwo
     C_APDU command(C_APDU_CLA_DEFAULT, C_APDU_DISABLE, password_type, 0, NULL, 0);
 
     /* build the command */
-    build_I_block_command(CMD_MASK_DISABLEVERIFREQ, &command, _did_byte, &length, _buffer);
+    build_I_block_command(CMD_MASK_DISABLE_VERIFREQ, &command, _did_byte, &length, _buffer);
 
     /* send the request */
     status = io_send_i2c_command(length, _buffer);
@@ -1075,8 +1080,8 @@ M24srError_t M24srDriver::disable_verification_requirement(PasswordType_t passwo
     }
 
     _last_command = DISABLE_VERIFICATION_REQUIREMENT;
-    //use the offset filed for store the pwd id;
-    _last_command_data.offset = (uint8_t) password_type;
+    /* use the offset to store the password type */
+    _last_command_data.offset = password_type;
 
     if (!manage_sync_communication(&status)) {
         get_callback()->on_disable_verification_requirement(this, status, password_type);
@@ -1087,17 +1092,17 @@ M24srError_t M24srDriver::disable_verification_requirement(PasswordType_t passwo
 
 M24srError_t M24srDriver::receive_disable_verification_requirement() {
     M24srError_t status;
-    uint8_t rensponse[STATUSRESPONSE_LENGTH];
+    uint8_t rensponse[STATUS_RESPONSE_LENGTH];
 
     PasswordType_t type = PasswordType_t(_last_command_data.offset);
 
-    status = io_receive_i2c_response(STATUSRESPONSE_LENGTH, rensponse);
+    status = io_receive_i2c_response(STATUS_RESPONSE_LENGTH, rensponse);
     if (status != M24SR_SUCCESS) {
         get_callback()->on_disable_verification_requirement(this, status, type);
         return status;
     }
 
-    status = is_correct_crc_residue(rensponse, STATUSRESPONSE_LENGTH);
+    status = is_correct_crc_residue(rensponse, STATUS_RESPONSE_LENGTH);
     get_callback()->on_disable_verification_requirement(this, status, type);
     return status;
 }
@@ -1121,7 +1126,7 @@ M24srError_t M24srDriver::enable_permanent_state(PasswordType_t password_type) {
     C_APDU command(C_APDU_CLA_ST, C_APDU_ENABLE, password_type, 0, NULL, 0);
 
     /* build the I2C command */
-    build_I_block_command(CMD_MASK_ENABLEVERIFREQ, &command, _did_byte, &length, _buffer);
+    build_I_block_command(CMD_MASK_ENABLE_VERIFREQ, &command, _did_byte, &length, _buffer);
 
     /* send the request */
     status = io_send_i2c_command(length, _buffer);
@@ -1131,8 +1136,8 @@ M24srError_t M24srDriver::enable_permanent_state(PasswordType_t password_type) {
     }
 
     _last_command = ENABLE_PERMANET_STATE;
-    //use the offset filed for store the pwd id;
-    _last_command_data.offset = (uint8_t) password_type;
+    /* use the offset to store the password type */
+    _last_command_data.offset = password_type;
 
     if (!manage_sync_communication(&status)) {
         get_callback()->on_enable_permanent_state(this, status, password_type);
@@ -1143,17 +1148,17 @@ M24srError_t M24srDriver::enable_permanent_state(PasswordType_t password_type) {
 
 M24srError_t M24srDriver::receive_enable_permanent_state() {
     M24srError_t status;
-    uint8_t rensponse[STATUSRESPONSE_LENGTH];
+    uint8_t rensponse[STATUS_RESPONSE_LENGTH];
 
     PasswordType_t type = PasswordType_t(_last_command_data.offset);
 
-    status = io_receive_i2c_response(STATUSRESPONSE_LENGTH, rensponse);
+    status = io_receive_i2c_response(STATUS_RESPONSE_LENGTH, rensponse);
     if (status != M24SR_SUCCESS) {
         get_callback()->on_enable_permanent_state(this, status, type);
         return status;
     }
 
-    status = is_correct_crc_residue(rensponse, STATUSRESPONSE_LENGTH);
+    status = is_correct_crc_residue(rensponse, STATUS_RESPONSE_LENGTH);
     get_callback()->on_enable_permanent_state(this, status, type);
     return status;
 }
@@ -1177,7 +1182,7 @@ M24srError_t M24srDriver::disable_permanent_state(PasswordType_t password_type) 
     C_APDU command(C_APDU_CLA_ST, C_APDU_DISABLE, password_type, 0, NULL, 0);
 
     /* build the I2C command */
-    build_I_block_command(CMD_MASK_DISABLEVERIFREQ, &command, _did_byte, &length, _buffer);
+    build_I_block_command(CMD_MASK_DISABLE_VERIFREQ, &command, _did_byte, &length, _buffer);
 
     /* send the request */
     status = io_send_i2c_command(length, _buffer);
@@ -1187,8 +1192,8 @@ M24srError_t M24srDriver::disable_permanent_state(PasswordType_t password_type) 
     }
 
     _last_command = DISABLE_PERMANET_STATE;
-    //use the offset filed for store the pwd id;
-    _last_command_data.offset = (uint8_t) password_type;
+    /* use the offset to store the password type */
+    _last_command_data.offset = password_type;
 
     if (!manage_sync_communication(&status)) {
         get_callback()->on_disable_permanent_state(this, status, password_type);
@@ -1199,17 +1204,17 @@ M24srError_t M24srDriver::disable_permanent_state(PasswordType_t password_type) 
 
 M24srError_t M24srDriver::receive_disable_permanent_state() {
     M24srError_t status;
-    uint8_t rensponse[STATUSRESPONSE_LENGTH];
+    uint8_t rensponse[STATUS_RESPONSE_LENGTH];
 
     PasswordType_t type = PasswordType_t(_last_command_data.offset);
 
-    status = io_receive_i2c_response(STATUSRESPONSE_LENGTH, rensponse);
+    status = io_receive_i2c_response(STATUS_RESPONSE_LENGTH, rensponse);
     if (status != M24SR_SUCCESS) {
         get_callback()->on_disable_permanent_state(this, status, type);
         return status;
     }
 
-    status = is_correct_crc_residue(rensponse, STATUSRESPONSE_LENGTH);
+    status = is_correct_crc_residue(rensponse, STATUS_RESPONSE_LENGTH);
     get_callback()->on_disable_permanent_state(this, status, type);
     return status;
 }
@@ -1231,7 +1236,7 @@ M24srError_t M24srDriver::send_interrupt() {
     C_APDU command(C_APDU_CLA_ST, C_APDU_INTERRUPT, P1_P2, 0, NULL, 0);
 
     /* build the I2C command */
-    build_I_block_command(CMD_MASK_SENDINTERRUPT, &command, _did_byte, &length, _buffer);
+    build_I_block_command(CMD_MASK_SEND_INTERRUPT, &command, _did_byte, &length, _buffer);
 
     return send_receive_i2c(length, _buffer);
 }
@@ -1249,11 +1254,11 @@ M24srError_t M24srDriver::send_receive_i2c(uint16_t length, uint8_t *buffer) {
         return status;
 
     /* read the response */
-    status = io_receive_i2c_response(STATUSRESPONSE_LENGTH, buffer);
+    status = io_receive_i2c_response(STATUS_RESPONSE_LENGTH, buffer);
     if (status != M24SR_SUCCESS)
         return status;
 
-    return is_correct_crc_residue(buffer, STATUSRESPONSE_LENGTH);
+    return is_correct_crc_residue(buffer, STATUS_RESPONSE_LENGTH);
 }
 
 /**
@@ -1276,7 +1281,7 @@ M24srError_t M24srDriver::state_control(bool gpo_reset) {
     C_APDU command(C_APDU_CLA_ST, C_APDU_INTERRUPT, P1_P2, 1, &reset, 0);
 
     /* build the I2C command */
-    build_I_block_command(CMD_MASK_GPOSTATE, &command, _did_byte, &length, _buffer);
+    build_I_block_command(CMD_MASK_GPO_STATE, &command, _did_byte, &length, _buffer);
 
     return send_receive_i2c(length, _buffer);
 }
@@ -1290,11 +1295,9 @@ M24srError_t M24srDriver::manage_i2c_gpo(NfcGpoState_t gpo_i2c_config) {
         return M24SR_IO_ERROR_PARAMETER;
     }
 
-    //enable the callback for change the gpo
     _component_cb = &_manage_gpo_cb;
     _manage_gpo_cb.set_new_gpo_config(true, gpo_i2c_config);
 
-    //start the manageGPO procedure
     return select_application();
 }
 
@@ -1343,7 +1346,7 @@ M24srError_t M24srDriver::io_receive_i2c_response(uint8_t length, uint8_t *buffe
 M24srError_t M24srDriver::io_poll_i2c() {
     int status = 1;
     while (status != 0) {
-        //send the device address and wait to receive an ack bit
+        /* send the device address and wait to receive an ack bit */
         status = _i2c_channel.write(M24SR_ADDR, NULL, 0);
     }
     return M24SR_SUCCESS;

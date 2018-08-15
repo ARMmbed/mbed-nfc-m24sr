@@ -68,11 +68,8 @@ namespace vendor {
 namespace ST {
 
 #define OPEN_SESSION_RETRIES  5
-
-#define CC_FILE_LENGTH_BYTE   15
-
+#define CC_FILE_LENGTH        15
 #define NDEF_FILE_HEADER_SIZE 2
-
 #define MAX_NDEF_SIZE         0x1FFF
 
 /**
@@ -1282,7 +1279,7 @@ private:
 
         void on_selected_cc_file(M24srDriver *nfc, M24srError_t status) {
             if (status == M24SR_SUCCESS) {
-                nfc->read_binary(0x0000, CC_FILE_LENGTH_BYTE, CCFile);
+                nfc->read_binary(0x0000, CC_FILE_LENGTH, CCFile);
             } else {
                 nfc->delegate()->has_started_session(false);
             }
@@ -1290,7 +1287,7 @@ private:
 
         void on_read_byte(M24srDriver *nfc, M24srError_t status, uint16_t, uint8_t *bytes_read,
                           uint16_t read_count) {
-            if (status != M24SR_SUCCESS || read_count != CC_FILE_LENGTH_BYTE) {
+            if (status != M24SR_SUCCESS || read_count != CC_FILE_LENGTH) {
                 nfc->delegate()->has_started_session(false);
             }
             uint16_t ndef_file_id = (uint16_t) ((bytes_read[0x09] << 8) | bytes_read[0x0A]);
