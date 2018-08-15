@@ -2,7 +2,7 @@
  ******************************************************************************
  * @file    m24sr_driver.cpp
  * @author  ST Central Labs
- * @brief This file provides a set of functions to interface with the M24SR
+ * @brief   This file provides a set of functions to interface with the M24SR
  *          device.
  ******************************************************************************
  * @attention
@@ -201,10 +201,10 @@ static M24srError_t is_correct_crc_residue(uint8_t *data, uint8_t length) {
 
 /**
  * @brief This functions creates an I block command according to the structures command_mask and Command.
- * @param Command  structure which contains the field of the different parameters
- * @param command_mask  structure of the command
+ * @param command_mask  structure which contains the field of the different parameters
+ * @param command  structure of the command
  * @param length  number of bytes of the command
- * @param pCommand  pointer to the command created
+ * @param command_buffer  pointer to the command created
  */
 static void build_I_block_command(uint16_t command_mask, C_APDU *command, uint8_t did, uint16_t *length,
                                   uint8_t *command_buffer) {

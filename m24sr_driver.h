@@ -2,7 +2,7 @@
  ******************************************************************************
  * @file    m24sr_driver.h
  * @author  ST Central Labs
- * @brief This file provides a set of functions to interface with the M24SR
+ * @brief   This file provides a set of functions to interface with the M24SR
  *          device.
  ******************************************************************************
  * @attention
