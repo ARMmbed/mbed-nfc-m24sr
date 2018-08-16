@@ -49,7 +49,7 @@ public:
          *
          * @param[in] success whether this operation succeeded
          */
-        virtual void on_size_set(bool success) = 0;
+        virtual void on_size_written(bool success) = 0;
 
         /**
          * Completion of size retrieval operation.
@@ -57,7 +57,7 @@ public:
          * @param[in] success whether this operation succeeded
          * @param[out] the current addressable memory size
          */
-        virtual void on_size_gotten(bool success, size_t size) = 0;
+        virtual void on_size_read(bool success, size_t size) = 0;
 
         /**
          * Completion of erasing operation.
@@ -135,13 +135,13 @@ public:
      * @param[in] count the number of addressable bytes.
      * This method should complete asynchronously by calling has_set_size().
      */
-    virtual void set_size(size_t count) = 0;
+    virtual void write_size(size_t count) = 0;
 
     /**
      * Get the size of the addressable memory.
      * This method should complete asynchronously by calling has_gotten_size().
      */
-    virtual void get_size() = 0;
+    virtual void read_size() = 0;
 
     /**
      * Erase bytes from memory.

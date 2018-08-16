@@ -524,14 +524,14 @@ public:
 
     /** @see NFCEEPROMDriver::set_size
      */
-    virtual void set_size(size_t count) {
+    virtual void write_size(size_t count) {
         if (!_is_session_open) {
-            delegate()->on_size_gotten(false, 0);
+            delegate()->on_size_read(false, 0);
             return;
         }
 
         if (count > MAX_NDEF_SIZE - NDEF_FILE_HEADER_SIZE) {
-            delegate()->on_size_gotten(false, 0);
+            delegate()->on_size_read(false, 0);
             return;
         }
 
@@ -549,9 +549,9 @@ public:
 
     /** @see NFCEEPROMDriver::get_size
      */
-    virtual void get_size() {
+    virtual void read_size() {
         if (!_is_session_open) {
-            delegate()->on_size_gotten(false, 0);
+            delegate()->on_size_read(false, 0);
             return;
         }
 
@@ -1369,11 +1369,11 @@ private:
         virtual void on_updated_binary(M24srDriver *nfc, M24srError_t status, uint16_t offset, uint8_t *bytes_written,
                                        uint16_t write_count) {
             if (status != M24SR_SUCCESS) {
-                nfc->delegate()->on_size_set(false);
+                nfc->delegate()->on_size_written(false);
                 return;
             }
 
-            nfc->delegate()->on_size_set(true);
+            nfc->delegate()->on_size_written(true);
         }
     };
 
@@ -1384,14 +1384,14 @@ private:
         virtual void on_read_byte(M24srDriver *nfc, M24srError_t status, uint16_t offset, uint8_t *bytes_read,
                                   uint16_t read_count) {
             if (status != M24SR_SUCCESS) {
-                nfc->delegate()->on_size_gotten(false, 0);
+                nfc->delegate()->on_size_read(false, 0);
                 return;
             }
 
             /* NDEF file size is BE */
             nfc->_ndef_size = (((uint16_t) nfc->_ndef_size_buffer[0]) << 8 | nfc->_ndef_size_buffer[1]);
 
-            nfc->delegate()->on_size_gotten(true, nfc->_ndef_size);
+            nfc->delegate()->on_size_read(true, nfc->_ndef_size);
         }
     };
 
