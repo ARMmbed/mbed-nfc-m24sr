@@ -434,7 +434,7 @@ public:
      */
     virtual void start_session(bool force = false) {
         if (_is_session_open) {
-            delegate()->on_start_session(true);
+            delegate()->on_session_started(true);
             return;
         }
 
@@ -454,12 +454,12 @@ public:
      */
     virtual void read_bytes(uint32_t address, uint8_t* bytes, size_t count) {
         if (!_is_session_open) {
-            delegate()->on_read_bytes(0);
+            delegate()->on_bytes_read(0);
             return;
         }
 
         if (address > _ndef_size) {
-            delegate()->on_read_bytes(0);
+            delegate()->on_bytes_read(0);
             return;
         }
 
@@ -474,7 +474,7 @@ public:
         }
 
         if (count == 0) {
-            delegate()->on_read_bytes(0);
+            delegate()->on_bytes_read(0);
             return;
         }
 
@@ -488,12 +488,12 @@ public:
      */
     virtual void write_bytes(uint32_t address, const uint8_t* bytes, size_t count) {
         if (!_is_session_open) {
-            delegate()->on_write_bytes(0);
+            delegate()->on_bytes_written(0);
             return;
         }
 
         if (address > _ndef_size) {
-            delegate()->on_write_bytes(0);
+            delegate()->on_bytes_written(0);
             return;
         }
 
@@ -512,7 +512,7 @@ public:
         }
 
         if (count == 0) {
-            delegate()->on_write_bytes(0);
+            delegate()->on_bytes_written(0);
             return;
         }
 
@@ -526,12 +526,12 @@ public:
      */
     virtual void set_size(size_t count) {
         if (!_is_session_open) {
-            delegate()->on_get_size(false, 0);
+            delegate()->on_size_gotten(false, 0);
             return;
         }
 
         if (count > MAX_NDEF_SIZE - NDEF_FILE_HEADER_SIZE) {
-            delegate()->on_get_size(false, 0);
+            delegate()->on_size_gotten(false, 0);
             return;
         }
 
@@ -551,7 +551,7 @@ public:
      */
     virtual void get_size() {
         if (!_is_session_open) {
-            delegate()->on_get_size(false, 0);
+            delegate()->on_size_gotten(false, 0);
             return;
         }
 
@@ -597,7 +597,7 @@ public:
 
 private:
     static void nfc_interrupt_callback() {
-        get_instance()->delegate()->on_handle_events();
+        get_instance()->delegate()->on_event();
     }
 
     /**
@@ -1260,7 +1260,7 @@ private:
             if (status == M24SR_SUCCESS) {
                 nfc->select_application();
             } else {
-                nfc->delegate()->on_start_session(false);
+                nfc->delegate()->on_session_started(false);
             }
         }
 
@@ -1269,7 +1269,7 @@ private:
                 nfc->select_cc_file();
             } else {
                 if (_retries == 0) {
-                    nfc->delegate()->on_start_session(false);
+                    nfc->delegate()->on_session_started(false);
                 } else {
                     _retries--;
                     nfc->select_application();
@@ -1281,14 +1281,14 @@ private:
             if (status == M24SR_SUCCESS) {
                 nfc->read_binary(0x0000, CC_FILE_LENGTH, CCFile);
             } else {
-                nfc->delegate()->on_start_session(false);
+                nfc->delegate()->on_session_started(false);
             }
         }
 
         void on_read_byte(M24srDriver *nfc, M24srError_t status, uint16_t, uint8_t *bytes_read,
                           uint16_t read_count) {
             if (status != M24SR_SUCCESS || read_count != CC_FILE_LENGTH) {
-                nfc->delegate()->on_start_session(false);
+                nfc->delegate()->on_session_started(false);
             }
             uint16_t ndef_file_id = (uint16_t) ((bytes_read[0x09] << 8) | bytes_read[0x0A]);
             nfc->_max_read_bytes = (uint16_t) ((bytes_read[0x03] << 8) | bytes_read[0x04]);
@@ -1298,7 +1298,7 @@ private:
 
         void on_selected_ndef_file(M24srDriver *nfc, M24srError_t status) {
             nfc->_is_session_open = (status == M24SR_SUCCESS);
-            nfc->delegate()->on_start_session(nfc->_is_session_open);
+            nfc->delegate()->on_session_started(nfc->_is_session_open);
         }
 
     private:
@@ -1319,9 +1319,9 @@ private:
         virtual void on_deselect(M24srDriver *nfc, M24srError_t status) {
             if (status == M24SR_SUCCESS) {
                 nfc->_is_session_open = false;
-                nfc->delegate()->on_end_session(true);
+                nfc->delegate()->on_session_ended(true);
             } else {
-                nfc->delegate()->on_end_session(false);
+                nfc->delegate()->on_session_ended(false);
             }
         }
     };
@@ -1336,11 +1336,11 @@ private:
         virtual void on_updated_binary(M24srDriver *nfc, M24srError_t status, uint16_t offset, uint8_t *bytes_written,
                                        uint16_t write_count) {
             if (status != M24SR_SUCCESS) {
-                nfc->delegate()->on_write_bytes(0);
+                nfc->delegate()->on_bytes_written(0);
                 return;
             }
 
-            nfc->delegate()->on_write_bytes(write_count);
+            nfc->delegate()->on_bytes_written(write_count);
         }
     };
 
@@ -1354,11 +1354,11 @@ private:
         virtual void on_read_byte(M24srDriver *nfc, M24srError_t status, uint16_t offset, uint8_t *bytes_read,
                                   uint16_t read_count) {
             if (status != M24SR_SUCCESS) {
-                nfc->delegate()->on_read_bytes(0);
+                nfc->delegate()->on_bytes_read(0);
                 return;
             }
 
-            nfc->delegate()->on_read_bytes(read_count);
+            nfc->delegate()->on_bytes_read(read_count);
         }
     };
 
@@ -1369,11 +1369,11 @@ private:
         virtual void on_updated_binary(M24srDriver *nfc, M24srError_t status, uint16_t offset, uint8_t *bytes_written,
                                        uint16_t write_count) {
             if (status != M24SR_SUCCESS) {
-                nfc->delegate()->on_set_size(false);
+                nfc->delegate()->on_size_set(false);
                 return;
             }
 
-            nfc->delegate()->on_set_size(true);
+            nfc->delegate()->on_size_set(true);
         }
     };
 
@@ -1384,14 +1384,14 @@ private:
         virtual void on_read_byte(M24srDriver *nfc, M24srError_t status, uint16_t offset, uint8_t *bytes_read,
                                   uint16_t read_count) {
             if (status != M24SR_SUCCESS) {
-                nfc->delegate()->on_get_size(false, 0);
+                nfc->delegate()->on_size_gotten(false, 0);
                 return;
             }
 
             /* NDEF file size is BE */
             nfc->_ndef_size = (((uint16_t) nfc->_ndef_size_buffer[0]) << 8 | nfc->_ndef_size_buffer[1]);
 
-            nfc->delegate()->on_get_size(true, nfc->_ndef_size);
+            nfc->delegate()->on_size_gotten(true, nfc->_ndef_size);
         }
     };
 
@@ -1402,11 +1402,11 @@ private:
         virtual void on_updated_binary(M24srDriver *nfc, M24srError_t status, uint16_t offset, uint8_t *bytes_written,
                                        uint16_t write_count) {
             if (status != M24SR_SUCCESS) {
-                nfc->delegate()->on_erase_bytes(0);
+                nfc->delegate()->on_bytes_erased(0);
                 return;
             }
 
-            nfc->delegate()->on_erase_bytes(write_count);
+            nfc->delegate()->on_bytes_erased(write_count);
         }
     };
 

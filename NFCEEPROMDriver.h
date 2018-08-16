@@ -21,35 +21,35 @@ public:
          *
          * @param[in] success whether this operation succeeded
          */
-        virtual void on_start_session(bool success) = 0;
+        virtual void on_session_started(bool success) = 0;
 
         /**
          * Completion of session end operation.
          *
          * @param[in] success whether this operation succeeded
          */
-        virtual void on_end_session(bool success) = 0;
+        virtual void on_session_ended(bool success) = 0;
 
         /**
          * Completion of read operation.
          *
          * @param[in] success whether this operation succeeded
          */
-        virtual void on_read_bytes(size_t count) = 0;
+        virtual void on_bytes_read(size_t count) = 0;
 
         /**
          * Completion of write operation.
          *
          * @param[in] success whether this operation succeeded
          */
-        virtual void on_write_bytes(size_t count) = 0;
+        virtual void on_bytes_written(size_t count) = 0;
 
         /**
          * Completion of size setting operation.
          *
          * @param[in] success whether this operation succeeded
          */
-        virtual void on_set_size(bool success) = 0;
+        virtual void on_size_set(bool success) = 0;
 
         /**
          * Completion of size retrieval operation.
@@ -57,19 +57,19 @@ public:
          * @param[in] success whether this operation succeeded
          * @param[out] the current addressable memory size
          */
-        virtual void on_get_size(bool success, size_t size) = 0;
+        virtual void on_size_gotten(bool success, size_t size) = 0;
 
         /**
          * Completion of erasing operation.
          *
          * @param[in] success whether this operation succeeded
          */
-        virtual void on_erase_bytes(size_t count) = 0;
+        virtual void on_bytes_erased(size_t count) = 0;
 
         /**
          * Indicate to user to put handle_events on the event queue.
          */
-        virtual void on_handle_events() = 0;
+        virtual void on_event() = 0;
     };
 
     /**
