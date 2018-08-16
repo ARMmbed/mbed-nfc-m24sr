@@ -406,14 +406,14 @@ public:
 
         virtual ~Callbacks() { }
     };
+private:
+    M24srDriver();
 
 public:
     static M24srDriver* get_instance() {
         static M24srDriver driver;
         return &driver;
     }
-
-    M24srDriver();
 
     virtual ~M24srDriver() { }
 
