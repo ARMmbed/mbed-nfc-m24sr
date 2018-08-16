@@ -21,40 +21,35 @@ public:
          *
          * @param[in] success whether this operation succeeded
          */
-        virtual void has_started_session(bool success) {
-        }
+        virtual void on_start_session(bool success) = 0;
 
         /**
          * Completion of session end operation.
          *
          * @param[in] success whether this operation succeeded
          */
-        virtual void has_ended_session(bool success) {
-        }
+        virtual void on_end_session(bool success) = 0;
 
         /**
          * Completion of read operation.
          *
          * @param[in] success whether this operation succeeded
          */
-        virtual void has_read_bytes(size_t count) {
-        }
+        virtual void on_read_bytes(size_t count) = 0;
 
         /**
          * Completion of write operation.
          *
          * @param[in] success whether this operation succeeded
          */
-        virtual void has_written_bytes(size_t count) {
-        }
+        virtual void on_write_bytes(size_t count) = 0;
 
         /**
          * Completion of size setting operation.
          *
          * @param[in] success whether this operation succeeded
          */
-        virtual void has_set_size(bool success) {
-        }
+        virtual void on_set_size(bool success) = 0;
 
         /**
          * Completion of size retrieval operation.
@@ -62,20 +57,24 @@ public:
          * @param[in] success whether this operation succeeded
          * @param[out] the current addressable memory size
          */
-        virtual void has_gotten_size(bool success, size_t size) {
-        }
+        virtual void on_get_size(bool success, size_t size) = 0;
 
         /**
          * Completion of erasing operation.
          *
          * @param[in] success whether this operation succeeded
          */
-        virtual void has_erased_bytes(size_t count) {
-        }
+        virtual void on_erase_bytes(size_t count) = 0;
 
+        /**
+         * Indicate to user to put handle_events on the event queue.
+         */
         virtual void on_handle_events() = 0;
     };
 
+    /**
+     * Process pending events (if any).
+     */
     void handle_events();
 
     /**
@@ -91,10 +90,12 @@ public:
      * This method should complete synchronously.
      */
     virtual void reset() = 0;
+
     /**
      * Get the maximum memory size addressable by the EEPROM.
      */
     virtual size_t get_max_size() = 0;
+
     /**
      * Start a session of operations (reads, writes, erases, size gets/sets).
      * This method is called prior to any memory access to allow the underlying implementation
@@ -102,11 +103,13 @@ public:
      * This method should complete asynchronously by calling has_started_session().
      */
     virtual void start_session(bool force = false) = 0; // This could lock the chip's RF interface
+
     /**
      * End a session.
      * This method should complete asynchronously by calling has_ended_session().
      */
     virtual void end_session() = 0;
+
     /**
      * Read bytes from memory.
      * @param[in] address the virtual address (starting from 0) from which to start the read.
@@ -116,6 +119,7 @@ public:
      * This method should complete asynchronously by calling has_read_bytes().
      */
     virtual void read_bytes(uint32_t address, uint8_t* bytes, size_t count) = 0;
+
     /**
      * Write bytes to memory.
      * @param[in] address the virtual address (starting from 0) from which to start the write.
@@ -125,17 +129,20 @@ public:
      * This method should complete asynchronously by calling has_written_bytes().
      */
     virtual void write_bytes(uint32_t address, const uint8_t* bytes, size_t count) = 0;
+
     /**
      * Set the size of the addressable memory.
      * @param[in] count the number of addressable bytes.
      * This method should complete asynchronously by calling has_set_size().
      */
     virtual void set_size(size_t count) = 0;
+
     /**
      * Get the size of the addressable memory.
      * This method should complete asynchronously by calling has_gotten_size().
      */
     virtual void get_size() = 0;
+
     /**
      * Erase bytes from memory.
      * @param[in] address the virtual address (starting from 0) from which to start erasing.
@@ -143,6 +150,7 @@ public:
      * This method should complete asynchronously by calling has_erased_bytes().
      */
     virtual void erase_bytes(uint32_t address, size_t size) = 0;
+
 protected:
     Delegate* delegate() {
         return _delegate;
