@@ -46,6 +46,7 @@
 #include <mbed.h>
 #include "I2C.h"
 #include "NFCEEPROMDriver.h"
+#include "EventQueue.h"
 
 #ifdef TARGET_DISCO_L475VG_IOT01A
 
@@ -66,6 +67,8 @@
 namespace nfc {
 namespace vendor {
 namespace ST {
+
+using events::EventQueue;
 
 #define OPEN_SESSION_RETRIES  5
 #define CC_FILE_LENGTH        15
@@ -426,7 +429,7 @@ public:
 
     /** @see NFCEEPROMDriver::get_max_size
      */
-    virtual size_t get_max_size() {
+    virtual size_t read_max_size() {
         return MAX_NDEF_SIZE;
     }
 
@@ -566,12 +569,6 @@ public:
         write_bytes(address, NULL, size);
     }
 
-    /** @see NFCEEPROMDriver::handle_events
-     */
-    void handle_events() {
-        manage_event();
-    }
-
     /**
      * Change the function to call when a command ends.
      * @param commandCallback Object containing the callback, if NULL it will use empty callback
@@ -597,7 +594,8 @@ public:
 
 private:
     static void nfc_interrupt_callback() {
-        get_instance()->delegate()->on_event();
+        M24srDriver* driver = get_instance();
+        driver->event_queue()->call(driver, &M24srDriver::manage_event);
     }
 
     /**
