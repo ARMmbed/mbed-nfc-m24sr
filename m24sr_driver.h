@@ -64,6 +64,7 @@
 
 #endif // DISCO_L475VG_IOT01A
 
+namespace mbed {
 namespace nfc {
 namespace vendor {
 namespace ST {
@@ -1462,9 +1463,10 @@ private:
     bool _is_session_open;
 };
 
-} //nfc
-} //vendor
 } //ST
+} //vendor
+} //nfc
+} //mbed
 
 #endif // M24SR_H
 

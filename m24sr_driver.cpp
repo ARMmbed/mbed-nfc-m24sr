@@ -36,6 +36,7 @@
 
 #include <m24sr_driver.h>
 
+namespace mbed {
 namespace nfc {
 namespace vendor {
 namespace ST {
@@ -1385,8 +1386,9 @@ M24srError_t M24srDriver::manage_event() {
     }
 }
 
-} //nfc
-} //vendor
 } //ST
+} //vendor
+} //nfc
+} //mbed
 
 /******************* (C) COPYRIGHT 2013 STMicroelectronics *****END OF FILE****/
