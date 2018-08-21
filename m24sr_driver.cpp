@@ -1394,4 +1394,9 @@ M24srError_t M24srDriver::manage_event() {
 } //nfc
 } //mbed
 
+NFCEEPROMDriver* greentea_nfc_EEPROM_driver_get_instance()
+{
+    return mbed::nfc::vendor::ST::M24srDriver::get_instance();
+}
+
 /******************* (C) COPYRIGHT 2013 STMicroelectronics *****END OF FILE****/
