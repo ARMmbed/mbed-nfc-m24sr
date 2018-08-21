@@ -326,6 +326,9 @@ M24srDriver::M24srDriver()
  * @return M24SR_SUCCESS if no errors
  */
 M24srError_t M24srDriver::init() {
+    /* force sync comms to avoid triggering the application with an event */
+    _communication_type = SYNC;
+
     /* force to open a i2c session */
     M24srError_t status = get_session(true);
 

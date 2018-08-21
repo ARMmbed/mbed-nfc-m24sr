@@ -424,6 +424,7 @@ public:
     /** @see NFCEEPROMDriver::reset
      */
     virtual void reset() {
+        set_callback(&_default_cb);
         init();
         manage_i2c_gpo(I2C_ANSWER_READY);
     }
@@ -596,7 +597,9 @@ public:
 private:
     static void nfc_interrupt_callback() {
         M24srDriver* driver = get_instance();
-        driver->event_queue()->call(driver, &M24srDriver::manage_event);
+        if (driver->_communication_type == ASYNC) {
+            driver->event_queue()->call(driver, &M24srDriver::manage_event);
+        }
     }
 
     /**
