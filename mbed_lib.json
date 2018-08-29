@@ -1,3 +1,10 @@
 {
-    "name": "MBED_NFC_M24SR"
+    "name": "MBED_NFC_M24SR",
+    "config": {
+        "nfceeprom": {
+            "macro_name": "MBED_CONF_NFCEEPROM",
+            "value": true,
+            "help": "Device supports NFC EEPROM"
+        }
+    }
 }
