@@ -437,7 +437,7 @@ public:
 
     /** @see NFCEEPROMDriver::start_session
      */
-    virtual void start_session(bool force = false) {
+    virtual void start_session(bool force = true) {
         if (_is_session_open) {
             delegate()->on_session_started(true);
             return;
