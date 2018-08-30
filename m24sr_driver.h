@@ -569,6 +569,7 @@ public:
         write_bytes(address, NULL, size);
     }
 
+private:
     /**
      * Change the function to call when a command ends.
      * @param commandCallback Object containing the callback, if NULL it will use empty callback
@@ -592,7 +593,6 @@ public:
         return _callback;
     }
 
-private:
     static void nfc_interrupt_callback() {
         M24srDriver* driver = get_instance();
         if (driver->_communication_type == ASYNC) {
