@@ -78,29 +78,29 @@ namespace ST {
  * User parameter used to invoke a command,
  * it is used to provide the data back with the response
  */
-typedef struct {
+struct CommandData_t {
     uint8_t *data; /**< data */
     uint16_t length; /**< number of bytes in the data array */
     uint16_t offset; /**< offset parameter used in the read/write command */
-} CommandData_t;
+};
 
 /**
  * @brief APDU Command structure
  */
 class C_APDU {
 public:
-    typedef struct {
+    struct C_APDUHeader_t {
         uint8_t CLA; /**< Command class */
         uint8_t INS; /**< Operation code */
         uint8_t P1; /**< Selection Mode */
         uint8_t P2; /**< Selection Option */
-    } C_APDUHeader_t;
+    };
 
-    typedef struct {
+    struct C_APDUBody_t {
         uint8_t LC; /**< Data field length */
         const uint8_t *data; /**< Command parameters */
         uint8_t LE; /**< Expected length of data to be returned */
-    } C_APDUBody_t;
+    };
 
     C_APDU(uint8_t cla, uint8_t ins, uint16_t p1p2, uint8_t length, const uint8_t* data, uint8_t expected) {
         header.CLA = cla;
@@ -119,13 +119,13 @@ public:
 /**
  * @brief SC response structure
  */
-typedef struct {
+struct R_APDU {
     uint8_t *data; /**< Data returned from the card */ // pointer on the transceiver buffer = ReaderRecBuf[CR95HF_DATA_OFFSET ];
     uint8_t SW1; /**< Command Processing status */
     uint8_t SW2; /**< Command Processing qualification */
-} R_APDU;
+};
 
-typedef enum {
+enum M24srError_t {
     M24SR_SUCCESS = 0,
     M24SR_ERROR = 0x6F00,
     M24SR_FILE_OVERFLOW_LE = 0x6280,
@@ -156,33 +156,33 @@ typedef enum {
     M24SR_IO_ERROR_NBATEMPT = 0x0015,
     M24SR_IO_NOACKNOWLEDGE = 0x0016,
     M24SR_IO_PIN_NOT_CONNECTED = 0x0017
-} M24srError_t;
+};
 
 /**
  * @brief GPO state
  */
-typedef enum {
+enum NfcGpoState_t {
     HIGH_IMPEDANCE = 0,
     SESSION_OPENED = 1,
     WIP = 2,
     I2C_ANSWER_READY = 3,
     INTERRUPT = 4,
     STATE_CONTROL = 5
-} NfcGpoState_t;
+};
 
 /**
  * Possible password to set.
  */
-typedef enum {
+enum PasswordType_t {
     READ_PASSWORD = 0x01, /**< Password to use before reading the tag */
     WRITE_PASSWORD = 0x02, /**< Password to use before writing the tag */
     I2C_PASSWORD = 0x03, /**< Root password, used only through nfc */
-} PasswordType_t;
+};
 
 /**
  * Command that the component can accept
  */
-typedef enum {
+enum Command_t {
     NONE,
     DESELECT,
     SELECT_APPLICATION,
@@ -199,15 +199,15 @@ typedef enum {
     DISABLE_VERIFICATION_REQUIREMENT,
     ENABLE_PERMANET_STATE,
     DISABLE_PERMANET_STATE,
-} Command_t;
+};
 
 /**
  * Communication mode used by this device
  */
-typedef enum {
+enum Communication_t {
     SYNC, /**< SYNC wait the command response before returning */
     ASYNC /**< ASYNC use a callback to notify the end of a command */
-} Communication_t;
+};
 
 /**
  * Class representing a M24SR component.
@@ -985,10 +985,10 @@ private:
      */
     class ChangeAccessStateCallback : public Callbacks {
     public:
-        typedef enum {
+        enum AccessType_t {
             WRITE,
             READ
-        } AccessType_t;
+        };
 
         /**
          * Build the chain of callbacks.
