@@ -69,8 +69,6 @@ namespace nfc {
 namespace vendor {
 namespace ST {
 
-using events::EventQueue;
-
 #define OPEN_SESSION_RETRIES  5
 #define CC_FILE_LENGTH        15
 #define NDEF_FILE_HEADER_SIZE 2
