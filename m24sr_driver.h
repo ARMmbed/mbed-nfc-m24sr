@@ -576,9 +576,9 @@ private:
      */
     void set_callback(Callbacks *callback) {
         if (callback) {
-            _callback = callback;
+            _command_cb = callback;
         } else {
-            _callback = &_default_cb;
+            _command_cb = &_default_cb;
         }
     }
 
@@ -587,10 +587,12 @@ private:
      * @return callback object to use
      */
     Callbacks *get_callback() {
-        if (_component_cb) {
-            return _component_cb;
+        /* this allows for two levels of operation, the previous command will continue
+         * when this set of callbacks has finished */
+        if (_subcommand_cb) {
+            return _subcommand_cb;
         }
-        return _callback;
+        return _command_cb;
     }
 
     static void nfc_interrupt_callback() {
@@ -608,7 +610,7 @@ private:
      * @note The password must have a length of 16 chars.
      */
     M24srError_t enable_read_password(const uint8_t* current_write_password, const uint8_t* new_password) {
-        _component_cb = &_change_password_request_status_cb;
+        _subcommand_cb = &_change_password_request_status_cb;
         _change_password_request_status_cb.set_task(READ_PASSWORD, new_password);
 
         return verify(WRITE_PASSWORD, current_write_password);
@@ -621,7 +623,7 @@ private:
      * @note The password must have a length of 16 chars.
      */
     M24srError_t disable_read_password(const uint8_t* current_write_password) {
-        _component_cb = &_change_password_request_status_cb;
+        _subcommand_cb = &_change_password_request_status_cb;
         _change_password_request_status_cb.set_task(READ_PASSWORD, NULL);
 
         return verify(WRITE_PASSWORD, current_write_password);
@@ -635,7 +637,7 @@ private:
      * @note The password must have a length of 16 chars.
      */
     M24srError_t enable_write_password(const uint8_t* current_write_password, uint8_t* new_password) {
-        _component_cb = &_change_password_request_status_cb;
+        _subcommand_cb = &_change_password_request_status_cb;
         _change_password_request_status_cb.set_task(WRITE_PASSWORD, new_password);
 
         return verify(WRITE_PASSWORD, current_write_password);
@@ -648,7 +650,7 @@ private:
      * @note The password must have a length of 16 chars.
      */
     M24srError_t disable_write_password(const uint8_t* current_write_password) {
-        _component_cb = &_change_password_request_status_cb;
+        _subcommand_cb = &_change_password_request_status_cb;
         _change_password_request_status_cb.set_task(WRITE_PASSWORD, NULL);
 
         return verify(WRITE_PASSWORD, current_write_password);
@@ -661,7 +663,7 @@ private:
      * @note The password must have a length of 16 chars.
      */
     M24srError_t disable_all_password(const uint8_t* super_user_password) {
-        _component_cb = &_remove_password_cb;
+        _subcommand_cb = &_remove_password_cb;
         return verify(I2C_PASSWORD, super_user_password);
     }
 
@@ -672,7 +674,7 @@ private:
      * @note The password must have a length of 16 chars.
      */
     M24srError_t enable_read_only(const uint8_t* current_write_password) {
-        _component_cb = &_change_access_state_cb;
+        _subcommand_cb = &_change_access_state_cb;
         _change_access_state_cb.change_access_state(ChangeAccessStateCallback::WRITE, false);
 
         return verify(WRITE_PASSWORD, current_write_password);
@@ -685,7 +687,7 @@ private:
      * @note The password must have a length of 16 chars.
      */
     M24srError_t disable_read_only(const uint8_t* current_write_password) {
-        _component_cb = &_change_access_state_cb;
+        _subcommand_cb = &_change_access_state_cb;
         _change_access_state_cb.change_access_state(ChangeAccessStateCallback::WRITE, true);
 
         return verify(I2C_PASSWORD, current_write_password);
@@ -698,7 +700,7 @@ private:
      * @note The password must have a length of 16 chars.
      */
     M24srError_t enable_write_only(const uint8_t* current_write_password) {
-        _component_cb = &_change_access_state_cb;
+        _subcommand_cb = &_change_access_state_cb;
         _change_access_state_cb.change_access_state(ChangeAccessStateCallback::READ, false);
 
         return verify(WRITE_PASSWORD, current_write_password);
@@ -711,7 +713,7 @@ private:
      * @note The password must have a length of 16 chars.
      */
     M24srError_t disable_write_only(const uint8_t* current_write_password) {
-        _component_cb = &_change_access_state_cb;
+        _subcommand_cb = &_change_access_state_cb;
         _change_access_state_cb.change_access_state(ChangeAccessStateCallback::READ, true);
 
         return verify(I2C_PASSWORD, current_write_password);
@@ -874,7 +876,7 @@ private:
          * @param status Command status.
          */
         void on_finish_command(M24srDriver *nfc, M24srError_t status) {
-            nfc->_component_cb = NULL;
+            nfc->_subcommand_cb = NULL;
 
             if (_enable) {
                 if (_type == READ_PASSWORD) {
@@ -967,7 +969,7 @@ private:
          * @param status Command status.
          */
         void on_finish_command(M24srDriver *nfc, M24srError_t status) {
-            nfc->_component_cb = NULL;
+            nfc->_subcommand_cb = NULL;
             _password = NULL;
             nfc->get_callback()->on_disable_all_password(nfc, status);
         }
@@ -1052,7 +1054,7 @@ private:
          * @param status Command status.
          */
         void on_finish_command(M24srDriver *nfc, M24srError_t status) {
-            nfc->_component_cb = NULL;
+            nfc->_subcommand_cb = NULL;
             if (_enable) {
                 if (_type == READ) {
                     //enable read = disable write only
@@ -1166,11 +1168,11 @@ private:
          * @param status Command status.
          */
         void on_finish_command(M24srDriver *nfc, M24srError_t status) {
-            nfc->_component_cb = NULL;
+            nfc->_subcommand_cb = NULL;
             if (_change_i2c_gpo) {
-                nfc->_callback->on_manage_i2c_gpo(nfc, status, _new_gpo_config);
+                nfc->_command_cb->on_manage_i2c_gpo(nfc, status, _new_gpo_config);
             } else {
-                nfc->_callback->on_manage_rf_gpo(nfc, status, _new_gpo_config);
+                nfc->_command_cb->on_manage_rf_gpo(nfc, status, _new_gpo_config);
             }
         }
 
@@ -1238,7 +1240,7 @@ private:
          * @param status Command status.
          */
         void on_finish_command(M24srDriver *nfc, M24srError_t status) {
-            nfc->_component_cb = NULL;
+            nfc->_subcommand_cb = NULL;
             nfc->get_callback()->on_read_id(nfc, status, _id);
         }
 
@@ -1422,14 +1424,14 @@ private:
     DigitalOut _rf_disable_pin;
 
     /** object containing the callbacks to use*/
-    Callbacks *_callback;
+    Callbacks *_command_cb;
 
     /**
      * Object with private callbacks used to hide high level commands each
      * calling multiple low level commands. This callbacks object has
      * higher priority comparing to the user callbacks.
      */
-    Callbacks *_component_cb;
+    Callbacks *_subcommand_cb;
 
     Callbacks _default_cb;
     ManageGPOCallback _manage_gpo_cb;

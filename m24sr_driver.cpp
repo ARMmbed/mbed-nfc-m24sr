@@ -299,8 +299,8 @@ M24srDriver::M24srDriver()
       _gpo_event_interrupt(NFC_GPO_PIN),
       _gpo_pin(NFC_GPO_PIN),
       _rf_disable_pin(NFC_RF_DISABLE_PIN),
-      _callback(&_default_cb),
-      _component_cb(NULL),
+      _command_cb(&_default_cb),
+      _subcommand_cb(NULL),
       _communication_type(SYNC),
       _last_command(NONE),
       _ndef_size(MAX_NDEF_SIZE),
@@ -538,7 +538,7 @@ M24srError_t M24srDriver::read_id(uint8_t *nfc_id) {
         return M24SR_ERROR;
     }
 
-    _component_cb = &_read_id_cb;
+    _subcommand_cb = &_read_id_cb;
     _read_id_cb.set_task(nfc_id);
 
     return select_application();
@@ -1299,7 +1299,7 @@ M24srError_t M24srDriver::manage_i2c_gpo(NfcGpoState_t gpo_i2c_config) {
         return M24SR_IO_ERROR_PARAMETER;
     }
 
-    _component_cb = &_manage_gpo_cb;
+    _subcommand_cb = &_manage_gpo_cb;
     _manage_gpo_cb.set_new_gpo_config(true, gpo_i2c_config);
 
     return select_application();
@@ -1314,7 +1314,7 @@ M24srError_t M24srDriver::manage_rf_gpo(NfcGpoState_t gpo_rf_config) {
         return M24SR_IO_ERROR_PARAMETER;
     }
 
-    _component_cb = &_manage_gpo_cb;
+    _subcommand_cb = &_manage_gpo_cb;
     _manage_gpo_cb.set_new_gpo_config(false, gpo_rf_config);
 
     return select_application();
