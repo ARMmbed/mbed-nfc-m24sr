@@ -35,6 +35,7 @@
  */
 
 #include <m24sr_driver.h>
+#include "Callback.h"
 
 namespace mbed {
 namespace nfc {
@@ -294,11 +295,12 @@ static M24srError_t is_S_block(uint8_t *buffer) {
     }
 }
 
-M24srDriver::M24srDriver()
-    : _i2c_channel(NFC_I2C_SDA_PIN, NFC_I2C_SCL_PIN),
-      _gpo_event_interrupt(NFC_GPO_PIN),
-      _gpo_pin(NFC_GPO_PIN),
-      _rf_disable_pin(NFC_RF_DISABLE_PIN),
+M24srDriver::M24srDriver(PinConfig_t* pin_config)
+    : _i2c_channel(pin_config? pin_config->i2c_data_pin : NFC_I2C_SDA_PIN,
+                   pin_config? pin_config->i2c_clock_pin : NFC_I2C_SCL_PIN),
+      _gpo_event_interrupt(pin_config? pin_config->gpo_pin : NFC_GPO_PIN),
+      _gpo_pin(pin_config? pin_config->gpo_pin : NFC_GPO_PIN),
+      _rf_disable_pin(pin_config? pin_config->rf_disable_pin : NFC_RF_DISABLE_PIN),
       _command_cb(&_default_cb),
       _subcommand_cb(NULL),
       _communication_type(SYNC),
@@ -315,7 +317,7 @@ M24srDriver::M24srDriver()
     }
 
     if (_gpo_pin.is_connected() != 0) {
-        _gpo_event_interrupt.fall(&nfc_interrupt_callback);
+        _gpo_event_interrupt.fall(mbed::callback(this, &M24srDriver::nfc_interrupt_callback));
         _gpo_event_interrupt.mode(PullUp);
         _gpo_event_interrupt.disable_irq();
     }
@@ -1396,7 +1398,8 @@ M24srError_t M24srDriver::manage_event() {
 
 mbed::nfc::NFCEEPROMDriver* greentea_nfc_EEPROM_driver_get_instance()
 {
-    return mbed::nfc::vendor::ST::M24srDriver::get_instance();
+    static mbed::nfc::vendor::ST::M24srDriver instance;
+    return &instance;
 }
 
 /******************* (C) COPYRIGHT 2013 STMicroelectronics *****END OF FILE****/

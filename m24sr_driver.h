@@ -69,6 +69,27 @@ namespace nfc {
 namespace vendor {
 namespace ST {
 
+/** struct which may be passed in to the Driver constructor to override pin names */
+struct PinConfig_t {
+    PinConfig_t()
+    : i2c_data_pin(NFC_I2C_SDA_PIN),
+      i2c_clock_pin(NFC_I2C_SCL_PIN),
+      gpo_pin(NFC_GPO_PIN),
+      rf_disable_pin(NFC_RF_DISABLE_PIN) { };
+
+    PinConfig_t(PinName set_i2c_data_pin, PinName set_i2c_clock_pin,
+                PinName set_gpo_pin, PinName set_rf_disable_pin)
+    : i2c_data_pin(set_i2c_data_pin),
+      i2c_clock_pin(set_i2c_clock_pin),
+      gpo_pin(set_gpo_pin),
+      rf_disable_pin(set_rf_disable_pin) { };
+
+    PinName i2c_data_pin;
+    PinName i2c_clock_pin;
+    PinName gpo_pin;
+    PinName rf_disable_pin;
+};
+
 #define OPEN_SESSION_RETRIES  5
 #define CC_FILE_LENGTH        15
 #define NDEF_FILE_HEADER_SIZE 2
@@ -408,14 +429,12 @@ public:
 
         virtual ~Callbacks() { }
     };
-private:
-    M24srDriver();
 
 public:
-    static M24srDriver* get_instance() {
-        static M24srDriver driver;
-        return &driver;
-    }
+    /** Create the driver, default pin names will be used appropriate for the board.
+     *  @param pin_config pin names to override the defaults.
+     */
+    M24srDriver(PinConfig_t* pin_config = NULL);
 
     virtual ~M24srDriver() { }
 
@@ -595,10 +614,9 @@ private:
         return _command_cb;
     }
 
-    static void nfc_interrupt_callback() {
-        M24srDriver* driver = get_instance();
-        if (driver->_communication_type == ASYNC) {
-            driver->event_queue()->call(driver, &M24srDriver::manage_event);
+    void nfc_interrupt_callback() {
+        if (_communication_type == ASYNC) {
+            event_queue()->call(this, &M24srDriver::manage_event);
         }
     }
 
