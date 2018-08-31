@@ -295,12 +295,12 @@ static M24srError_t is_S_block(uint8_t *buffer) {
     }
 }
 
-M24srDriver::M24srDriver(PinConfig_t* pin_config)
-    : _i2c_channel(pin_config? pin_config->i2c_data_pin : NFC_I2C_SDA_PIN,
-                   pin_config? pin_config->i2c_clock_pin : NFC_I2C_SCL_PIN),
-      _gpo_event_interrupt(pin_config? pin_config->gpo_pin : NFC_GPO_PIN),
-      _gpo_pin(pin_config? pin_config->gpo_pin : NFC_GPO_PIN),
-      _rf_disable_pin(pin_config? pin_config->rf_disable_pin : NFC_RF_DISABLE_PIN),
+M24srDriver::M24srDriver(PinName i2c_data_pin, PinName i2c_clock_pin,
+                         PinName gpo_pin, PinName rf_disable_pin)
+    : _i2c_channel(i2c_data_pin, i2c_clock_pin),
+      _gpo_event_interrupt(gpo_pin),
+      _gpo_pin(gpo_pin),
+      _rf_disable_pin(rf_disable_pin),
       _command_cb(&_default_cb),
       _subcommand_cb(NULL),
       _communication_type(SYNC),
