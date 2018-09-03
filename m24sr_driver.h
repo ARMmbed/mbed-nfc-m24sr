@@ -50,17 +50,17 @@
 
 #ifdef TARGET_DISCO_L475VG_IOT01A
 
-#define NFC_I2C_SDA_PIN     PB_11
-#define NFC_I2C_SCL_PIN     PB_10
-#define NFC_GPO_PIN         PE_4
-#define NFC_RF_DISABLE_PIN  PE_2
+#define M24SR_I2C_SDA_PIN     PB_11
+#define M24SR_I2C_SCL_PIN     PB_10
+#define M24SR_GPO_PIN         PE_4
+#define M24SR_RF_DISABLE_PIN  PE_2
 
 #else // X-NUCLEO-NFC01A1
 
-#define NFC_I2C_SDA_PIN     D14
-#define NFC_I2C_SCL_PIN     D15
-#define NFC_GPO_PIN         D12
-#define NFC_RF_DISABLE_PIN  D11
+#define M24SR_I2C_SDA_PIN     D14
+#define M24SR_I2C_SCL_PIN     D15
+#define M24SR_GPO_PIN         D12
+#define M24SR_RF_DISABLE_PIN  D11
 
 #endif // DISCO_L475VG_IOT01A
 
@@ -416,8 +416,8 @@ public:
      *  @param gpo_pin I2C GPO pin name.
      *  @param rf_disable_pin pin name for breaking the RF connection.
      */
-    M24srDriver(PinName i2c_data_pin = NFC_I2C_SDA_PIN, PinName i2c_clock_pin = NFC_I2C_SCL_PIN,
-                PinName gpo_pin = NFC_GPO_PIN, PinName rf_disable_pin = NFC_RF_DISABLE_PIN);
+    M24srDriver(PinName i2c_data_pin = M24SR_I2C_SDA_PIN, PinName i2c_clock_pin = M24SR_I2C_SCL_PIN,
+                PinName gpo_pin = M24SR_GPO_PIN, PinName rf_disable_pin = M24SR_RF_DISABLE_PIN);
 
     virtual ~M24srDriver() { }
 
