@@ -1,6 +1,11 @@
 {
     "name": "MBED_NFC_M24SR",
     "config": {
+        "X_NUCLEO_NFC01A1": {
+            "macro_name": "MBED_CONF_X_NUCLEO_NFC01A1",
+            "value": false,
+            "help": "Device is using an X-NUCLEO-NFC01A1 shield attached through an arduino header"
+        },
         "nfceeprom": {
             "macro_name": "MBED_CONF_NFCEEPROM",
             "value": true,

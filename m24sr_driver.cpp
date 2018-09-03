@@ -309,6 +309,12 @@ M24srDriver::M24srDriver(PinName i2c_data_pin, PinName i2c_clock_pin,
       _max_read_bytes(MAX_PAYLOAD),
       _max_write_bytes(MAX_PAYLOAD),
       _is_session_open(false) {
+    /* driver requires valid pin names */
+    MBED_ASSERT(i2c_data_pin != NC);
+    MBED_ASSERT(i2c_clock_pin != NC);
+    MBED_ASSERT(gpo_pin != NC);
+    MBED_ASSERT(rf_disable_pin != NC);
+
     memset(_buffer, 0, 0xFF);
     _did_byte = 0;
 

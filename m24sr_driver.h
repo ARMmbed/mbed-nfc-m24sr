@@ -48,21 +48,28 @@
 #include "NFCEEPROMDriver.h"
 #include "EventQueue.h"
 
-#ifdef TARGET_DISCO_L475VG_IOT01A
+#if defined TARGET_DISCO_L475VG_IOT01A
 
 #define M24SR_I2C_SDA_PIN     PB_11
 #define M24SR_I2C_SCL_PIN     PB_10
 #define M24SR_GPO_PIN         PE_4
 #define M24SR_RF_DISABLE_PIN  PE_2
 
-#else // X-NUCLEO-NFC01A1
+#elif MBED_CONF_X_NUCLEO_NFC01A1
 
 #define M24SR_I2C_SDA_PIN     D14
 #define M24SR_I2C_SCL_PIN     D15
 #define M24SR_GPO_PIN         D12
 #define M24SR_RF_DISABLE_PIN  D11
 
-#endif // DISCO_L475VG_IOT01A
+#else
+
+#define M24SR_I2C_SDA_PIN     NC
+#define M24SR_I2C_SCL_PIN     NC
+#define M24SR_GPO_PIN         NC
+#define M24SR_RF_DISABLE_PIN  NC
+
+#endif
 
 namespace mbed {
 namespace nfc {
