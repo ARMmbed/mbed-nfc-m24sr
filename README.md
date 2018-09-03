@@ -1,6 +1,6 @@
 # M24SR Driver
 
-This is a driver needed by `NFCEPROOM` constructor for the ST M24SR NFC chip.
+This is a driver needed by `NFCEEPROOM` constructor for the ST M24SR NFC chip.
 
 ## Requirements
 
