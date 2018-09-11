@@ -865,7 +865,7 @@ private:
             on_finish_command(nfc, status);
         }
 
-        virtual void on_change_reference_data(M24srDriver *nfc, M24srError_t status, PasswordType_t type, uint8_t *) {
+        virtual void on_change_reference_data(M24srDriver *nfc, M24srError_t status, PasswordType_t type, const uint8_t *) {
             if (status == M24SR_SUCCESS) {
                 nfc->enable_permanent_state(type);
             } else {
@@ -959,7 +959,7 @@ private:
         }
 
         virtual void on_change_reference_data(M24srDriver *nfc, M24srError_t status, PasswordType_t type,
-                                              uint8_t *data) {
+                                              const uint8_t *data) {
             if (status != M24SR_SUCCESS) {
                 return on_finish_command(nfc, status);
             }
