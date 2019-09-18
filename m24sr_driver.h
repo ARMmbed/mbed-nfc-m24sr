@@ -132,7 +132,7 @@ struct R_APDU {
     uint8_t SW2; /**< Command Processing qualification */
 };
 
-enum M24srError_t {
+enum M24srError_t : uint16_t {
     M24SR_SUCCESS = 0,
     M24SR_ERROR = 0x6F00,
     M24SR_FILE_OVERFLOW_LE = 0x6280,

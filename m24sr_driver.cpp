@@ -174,7 +174,7 @@ static uint16_t compute_crc(uint8_t *data, uint8_t length) {
  */
 static M24srError_t is_correct_crc_residue(uint8_t *data, uint8_t length) {
     uint16_t res_crc = 0x0000;
-    M24srError_t status;
+    uint16_t status;
 
     /* check the CRC16 Residue */
     if (length != 0) {
@@ -183,8 +183,8 @@ static M24srError_t is_correct_crc_residue(uint8_t *data, uint8_t length) {
 
     if (res_crc == 0x0000) {
         /* Good CRC, but error status from M24SR */
-        status = (M24srError_t) (((data[length - UB_STATUS_OFFSET] << 8) & 0xFF00)
-            | (data[length - LB_STATUS_OFFSET] & 0x00FF));
+        status = ((data[length - UB_STATUS_OFFSET] << 8) & 0xFF00)
+            | (data[length - LB_STATUS_OFFSET] & 0x00FF);
     } else {
         res_crc = 0x0000;
         res_crc = compute_crc(data, 5);
@@ -193,15 +193,15 @@ static M24srError_t is_correct_crc_residue(uint8_t *data, uint8_t length) {
             return M24SR_IO_ERROR_CRC;
         } else {
             /* Good CRC, but error status from M24SR */
-            status = (M24srError_t) (((data[1] << 8) & 0xFF00) | (data[2] & 0x00FF));
+            status = ((data[1] << 8) & 0xFF00) | (data[2] & 0x00FF);
         }
     }
 
     if (status == NFC_COMMAND_SUCCESS) {
-        status = M24SR_SUCCESS;
+        return M24SR_SUCCESS;
     }
 
-    return status;
+    return (M24srError_t)status;
 }
 
 /**
