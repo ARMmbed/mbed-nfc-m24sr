@@ -46,7 +46,7 @@ namespace ST {
 #define MAX_PAYLOAD                241
 
 /** value returned by the NFC chip when a command is successfully completed */
-#define NFC_COMMAND_SUCCESS        0x9000
+static constexpr const uint16_t NFC_COMMAND_SUCCESS = 0x9000;
 /** I2C nfc address */
 #define M24SR_ADDR                 0xAC
 
