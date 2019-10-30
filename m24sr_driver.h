@@ -439,7 +439,7 @@ public:
     /** @see NFCEEPROMDriver::get_max_size
      */
     virtual size_t read_max_size() {
-        return MAX_NDEF_SIZE;
+        return MAX_NDEF_SIZE - NDEF_FILE_HEADER_SIZE;
     }
 
     /** @see NFCEEPROMDriver::start_session
